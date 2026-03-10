@@ -60,11 +60,9 @@ class LoginActivity : AppCompatActivity() {
             }
             if (loginResult.success != null) {
                 updateUiWithUser(loginResult.success)
-
-                // Ir a la pantalla principal
                 val intent = Intent(this, MainActivity::class.java)
                 startActivity(intent)
-
+                finish()
             }
 
         })

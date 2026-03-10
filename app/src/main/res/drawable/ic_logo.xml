@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="60dp"
+    android:height="60dp"
+    android:viewportWidth="60"
+    android:viewportHeight="60">
+
+    <!-- Green circle background -->
+    <path
+        android:fillColor="#386641"
+        android:pathData="M30,2A28,28,0,1,0,30,58A28,28,0,1,0,30,2Z"/>
+
+    <!-- Fork left tine -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M19,13L20.2,13L20.2,25L19,25Z"/>
+    <!-- Fork middle tine -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M22,13L23.2,13L23.2,25L22,25Z"/>
+    <!-- Fork right tine -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M25,13L26.2,13L26.2,25L25,25Z"/>
+    <!-- Fork arch connecting tines -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M19,24.5Q22.5,29 26.2,24.5L26.2,25.5Q22.5,30.5 19,25.5Z"/>
+    <!-- Fork handle -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M21.5,28L23.5,28L23.5,45L21.5,45Z"/>
+
+    <!-- Leaf body -->
+    <path
+        android:fillColor="#A7C957"
+        android:pathData="M33,13Q44,21 41,33Q39,38 36,36Q30,29 33,13Z"/>
+    <!-- Leaf vein -->
+    <path
+        android:fillColor="#386641"
+        android:pathData="M33,14Q39,26 39,34L38,34Q38,26 32.2,14.5Z"/>
+</vector>

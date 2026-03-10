@@ -1,12 +1,13 @@
 <resources>
-    <string name="app_name">My Application</string>
-    <string name="title_activity_login">LoginActivity</string>
-    <string name="prompt_email">Email</string>
-    <string name="prompt_password">Password</string>
-    <string name="action_sign_in">Sign in or register</string>
-    <string name="action_sign_in_short">Sign in</string>
-    <string name="welcome">"Welcome !"</string>
-    <string name="invalid_username">Not a valid username</string>
-    <string name="invalid_password">Password must be >5 characters</string>
-    <string name="login_failed">"Login failed"</string>
+    <string name="app_name">Second Serving</string>
+    <string name="title_activity_login">Login</string>
+    <string name="prompt_email">username@email.com</string>
+    <string name="prompt_password">••••••••</string>
+    <string name="action_sign_in">Login</string>
+    <string name="action_sign_in_short">Login</string>
+    <string name="welcome">Welcome back!</string>
+    <string name="invalid_username">Enter a valid email address</string>
+    <string name="invalid_password">Password must be at least 6 characters</string>
+    <string name="login_failed">Login failed. Please check your credentials.</string>
+    <string name="forgot_password">Forgot password?</string>
 </resources>
