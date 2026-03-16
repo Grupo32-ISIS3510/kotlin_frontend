@@ -5,5 +5,7 @@ package com.app.secondserving.data.model
  */
 data class LoggedInUser(
     val userId: String,
-    val displayName: String
+    val displayName: String,
+    val email: String,
+    val token: String
 )
