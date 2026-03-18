@@ -2,6 +2,7 @@ package com.app.secondserving.data.network
 
 import retrofit2.Response
 import retrofit2.http.Body
+import retrofit2.http.GET
 import retrofit2.http.POST
 
 interface ApiService {
@@ -10,4 +11,7 @@ interface ApiService {
 
     @POST("auth/register")
     suspend fun register(@Body request: RegisterRequest): Response<TokenResponse>
+
+    @GET("inventory")
+    suspend fun getInventory(): Response<InventoryResponse>
 }
