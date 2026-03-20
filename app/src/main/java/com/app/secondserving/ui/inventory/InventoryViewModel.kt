@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.app.secondserving.data.InventoryRepository
 import com.app.secondserving.data.Result
+import com.app.secondserving.data.network.InventoryItemRequest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,6 +31,13 @@ sealed class InventoryUiState {
     data class Error(val message: String) : InventoryUiState()
 }
 
+sealed class AddItemUiState {
+    object Idle : AddItemUiState()
+    object Loading : AddItemUiState()
+    object Success : AddItemUiState()
+    data class Error(val message: String) : AddItemUiState()
+}
+
 class InventoryViewModel(private val repository: InventoryRepository) : ViewModel() {
 
     private val _uiState = MutableStateFlow<InventoryUiState>(InventoryUiState.Loading)
@@ -42,6 +50,8 @@ class InventoryViewModel(private val repository: InventoryRepository) : ViewMode
     val selectedCategory: StateFlow<String> = _selectedCategory.asStateFlow()
 
     private var allItems: List<InventoryItemUi> = emptyList()
+    private val _addItemState = MutableStateFlow<AddItemUiState>(AddItemUiState.Idle)
+    val addItemState: StateFlow<AddItemUiState> = _addItemState.asStateFlow()
 
     fun loadInventory() {
         viewModelScope.launch {
@@ -100,6 +110,40 @@ class InventoryViewModel(private val repository: InventoryRepository) : ViewMode
             matchesSearch && matchesCategory
         }
         _uiState.value = InventoryUiState.Success(filtered)
+    }
+
+    fun createInventoryItem(
+        name: String,
+        category: String,
+        quantity: Double,
+        purchaseDate: String,
+        expiryDate: String
+    ) {
+        viewModelScope.launch {
+            _addItemState.value = AddItemUiState.Loading
+            val request = InventoryItemRequest(
+                name = name,
+                category = category,
+                quantity = quantity,
+                purchase_date = purchaseDate,
+                expiry_date = expiryDate
+            )
+            when (val result = repository.createInventoryItem(request)) {
+                is Result.Success -> {
+                    _addItemState.value = AddItemUiState.Success
+                    loadInventory()
+                }
+                is Result.Error -> {
+                    _addItemState.value = AddItemUiState.Error(
+                        result.exception.message ?: "Error desconocido"
+                    )
+                }
+            }
+        }
+    }
+
+    fun resetAddItemState() {
+        _addItemState.value = AddItemUiState.Idle
     }
 }
 
