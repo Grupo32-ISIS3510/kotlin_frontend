@@ -21,9 +21,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.app.secondserving.ui.inventory.InventoryViewModel
 import com.app.secondserving.data.InventoryRepository
+import com.app.secondserving.ui.inventory.AddItemScreen
 import com.app.secondserving.ui.inventory.InventoryScreen
+import com.app.secondserving.ui.inventory.InventoryViewModel
 import com.app.secondserving.ui.inventory.InventoryViewModelFactory
 import com.app.secondserving.ui.theme.MyApplicationTheme
 
@@ -49,10 +50,19 @@ enum class AppDestinations(val label: String, val icon: ImageVector) {
 @Composable
 fun MyApplicationApp() {
     var currentDestination by rememberSaveable { mutableStateOf(AppDestinations.DESPENSA) }
+    var showAddItem by remember { mutableStateOf(false) }
 
     val inventoryViewModel: InventoryViewModel = viewModel(
         factory = InventoryViewModelFactory(InventoryRepository())
     )
+
+    if (showAddItem) {
+        AddItemScreen(
+            viewModel = inventoryViewModel,
+            onNavigateBack = { showAddItem = false }
+        )
+        return
+    }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -60,7 +70,6 @@ fun MyApplicationApp() {
             NavigationBar(containerColor = Color.White) {
                 AppDestinations.entries.forEachIndexed { index, destination ->
                     if (index == 2) {
-                        // FAB placeholder slot between RECETAS and PERFIL — spacer
                         NavigationBarItem(
                             selected = false,
                             onClick = {},
@@ -86,7 +95,10 @@ fun MyApplicationApp() {
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = {},
+                onClick = {
+                    inventoryViewModel.resetAddItemState()
+                    showAddItem = true
+                },
                 containerColor = Color(0xFF386641),
                 contentColor = Color.White
             ) {
