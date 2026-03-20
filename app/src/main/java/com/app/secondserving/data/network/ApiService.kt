@@ -17,4 +17,7 @@ interface ApiService {
 
     @POST("inventory")
     suspend fun createInventoryItem(@Body request: InventoryItemRequest): Response<InventoryItem>
+
+    @POST("notifications/token")
+    suspend fun registerFcmToken(@Body body: Map<String, String>): Response<Unit>
 }
