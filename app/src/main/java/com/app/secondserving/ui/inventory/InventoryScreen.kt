@@ -1,5 +1,7 @@
 package com.app.secondserving.ui.inventory
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
@@ -26,6 +28,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.viewmodel.compose.viewModel
 
 private val GreenDark = Color(0xFF386641)
 private val UrgencyRed = Color(0xFFE53935)
@@ -37,16 +40,28 @@ private val CardColor = Color.White
 private val CATEGORIES = listOf("Todos", "Frutas", "Verduras", "Lácteos", "Carnes", "Otros")
 
 @Composable
-fun InventoryScreen(viewModel: InventoryViewModel) {
+fun InventoryScreen(
+    viewModel: InventoryViewModel,
+    weatherViewModel: WeatherViewModel = viewModel()
+) {
     val uiState by viewModel.uiState.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val selectedCategory by viewModel.selectedCategory.collectAsState()
+    val weatherState by weatherViewModel.weatherState.collectAsState()
 
-    // Refresh on resume
+    val locationLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) weatherViewModel.loadWeather()
+    }
+
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) viewModel.loadInventory()
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.loadInventory()
+                locationLauncher.launch(android.Manifest.permission.ACCESS_COARSE_LOCATION)
+            }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
@@ -99,7 +114,48 @@ fun InventoryScreen(viewModel: InventoryViewModel) {
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Banner del clima
+        when (val ws = weatherState) {
+            is WeatherUiState.Success -> {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0xFFE8F5E9),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("🌤️", fontSize = 24.sp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = "${ws.weather.city} · ${ws.weather.temperature.toInt()}°C",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp,
+                                color = GreenDark
+                            )
+                            Text(
+                                text = "Humedad ${ws.weather.humidity}% · ${ws.weather.description}",
+                                fontSize = 12.sp,
+                                color = Color(0xFF555555)
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+            is WeatherUiState.Loading -> {
+                LinearProgressIndicator(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = GreenDark
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+            else -> {}
+        }
 
         // Search bar
         OutlinedTextField(
@@ -145,7 +201,6 @@ fun InventoryScreen(viewModel: InventoryViewModel) {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Section header
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -168,7 +223,6 @@ fun InventoryScreen(viewModel: InventoryViewModel) {
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Content
         when (val state = uiState) {
             is InventoryUiState.Loading -> {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -178,29 +232,19 @@ fun InventoryScreen(viewModel: InventoryViewModel) {
             is InventoryUiState.Error -> {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = "No se pudo cargar el inventario",
-                            color = Color.Gray,
-                            fontSize = 16.sp
-                        )
+                        Text("No se pudo cargar el inventario", color = Color.Gray, fontSize = 16.sp)
                         Spacer(modifier = Modifier.height(12.dp))
                         Button(
                             onClick = { viewModel.loadInventory() },
                             colors = ButtonDefaults.buttonColors(containerColor = GreenDark)
-                        ) {
-                            Text("Reintentar")
-                        }
+                        ) { Text("Reintentar") }
                     }
                 }
             }
             is InventoryUiState.Success -> {
                 if (state.items.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(
-                            text = "Tu despensa está vacía",
-                            color = Color.Gray,
-                            fontSize = 16.sp
-                        )
+                        Text("Tu despensa está vacía", color = Color.Gray, fontSize = 16.sp)
                     }
                 } else {
                     LazyVerticalGrid(
@@ -210,7 +254,10 @@ fun InventoryScreen(viewModel: InventoryViewModel) {
                         contentPadding = PaddingValues(bottom = 16.dp)
                     ) {
                         items(state.items) { item ->
-                            InventoryCard(item)
+                            InventoryCard(
+                                item = item,
+                                storageTip = weatherViewModel.getStorageTip(item.name)
+                            )
                         }
                     }
                 }
@@ -220,7 +267,7 @@ fun InventoryScreen(viewModel: InventoryViewModel) {
 }
 
 @Composable
-private fun InventoryCard(item: InventoryItemUi) {
+private fun InventoryCard(item: InventoryItemUi, storageTip: String) {
     val urgencyColor = when (item.urgency) {
         Urgency.RED -> UrgencyRed
         Urgency.YELLOW -> UrgencyYellow
@@ -236,7 +283,6 @@ private fun InventoryCard(item: InventoryItemUi) {
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column {
-            // Image area with badge
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -247,15 +293,10 @@ private fun InventoryCard(item: InventoryItemUi) {
                     imageVector = Icons.Default.ShoppingCart,
                     contentDescription = null,
                     tint = Color(0xFFCCCCCC),
-                    modifier = Modifier
-                        .size(48.dp)
-                        .align(Alignment.Center)
+                    modifier = Modifier.size(48.dp).align(Alignment.Center)
                 )
-                // Days badge
                 Surface(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(8.dp),
+                    modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
                     shape = RoundedCornerShape(12.dp),
                     color = urgencyColor
                 ) {
@@ -269,7 +310,6 @@ private fun InventoryCard(item: InventoryItemUi) {
                 }
             }
 
-            // Info
             Column(modifier = Modifier.padding(10.dp)) {
                 Text(
                     text = item.name,
@@ -287,12 +327,18 @@ private fun InventoryCard(item: InventoryItemUi) {
                 Spacer(modifier = Modifier.height(6.dp))
                 LinearProgressIndicator(
                     progress = { progress },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(5.dp)
-                        .clip(RoundedCornerShape(4.dp)),
+                    modifier = Modifier.fillMaxWidth().height(5.dp).clip(RoundedCornerShape(4.dp)),
                     color = urgencyColor,
                     trackColor = Color(0xFFE0E0E0)
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = storageTip,
+                    fontSize = 11.sp,
+                    color = Color(0xFF555555),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    lineHeight = 14.sp
                 )
             }
         }
