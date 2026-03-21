@@ -9,6 +9,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,7 +33,8 @@ private val DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd")
 @Composable
 fun AddItemScreen(
     viewModel: InventoryViewModel,
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    onOpenScanner: (() -> Unit)? = null
 ) {
     val addItemState by viewModel.addItemState.collectAsState()
 
@@ -53,11 +55,9 @@ fun AddItemScreen(
     var predictedExpiryDate by remember { mutableStateOf("") }
     var storageTip by remember { mutableStateOf("") }
 
-    // Selectores de fecha con calendario
+    // Selectores de fecha
     var showPurchaseDatePicker by remember { mutableStateOf(false) }
     var showExpiryDatePicker by remember { mutableStateOf(false) }
-    var purchaseDateLocal by remember { mutableStateOf<LocalDate?>(null) }
-    var expiryDateLocal by remember { mutableStateOf<LocalDate?>(null) }
 
     // Actualizar predicción cuando cambia categoría o fecha de compra
     LaunchedEffect(category, purchaseDate) {
@@ -91,6 +91,27 @@ fun AddItemScreen(
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Volver")
+                    }
+                },
+                actions = {
+                    // Botón para escanear factura
+                    if (onOpenScanner != null) {
+                        IconButton(onClick = onOpenScanner) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Icon(
+                                    Icons.Default.QrCodeScanner,
+                                    contentDescription = "Escanear factura",
+                                    tint = GreenDark
+                                )
+                                Text(
+                                    text = "Escanear",
+                                    fontSize = 10.sp,
+                                    color = GreenDark
+                                )
+                            }
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -176,7 +197,7 @@ fun AddItemScreen(
                 singleLine = true
             )
 
-            // Fecha de compra con calendario
+            // Fecha de compra con botón de calendario
             OutlinedTextField(
                 value = purchaseDate,
                 onValueChange = {},
@@ -200,11 +221,34 @@ fun AddItemScreen(
 
             // Dialog selector de fecha de compra
             if (showPurchaseDatePicker) {
-                DatePickerDialog(
+                var selectedYear by remember { mutableStateOf(LocalDate.now().year) }
+                var selectedMonth by remember { mutableStateOf(LocalDate.now().monthValue - 1) }
+                var selectedDay by remember { mutableStateOf(LocalDate.now().dayOfMonth) }
+                
+                AlertDialog(
                     onDismissRequest = { showPurchaseDatePicker = false },
+                    title = { Text("Fecha de compra") },
+                    text = {
+                        android.widget.DatePicker(
+                            androidx.compose.ui.platform.LocalContext.current,
+                            null,
+                            android.R.attr.datePickerStyle
+                        ).apply {
+                            updateDate(selectedYear, selectedMonth, selectedDay)
+                            setOnDateChangedListener { _, year, month, day ->
+                                selectedYear = year
+                                selectedMonth = month
+                                selectedDay = day
+                            }
+                        }
+                    },
                     confirmButton = {
                         TextButton(
                             onClick = {
+                                val date = String.format("%04d-%02d-%02d", selectedYear, selectedMonth + 1, selectedDay)
+                                purchaseDate = date
+                                purchaseDateError = false
+                                showPredictionTip = false
                                 showPurchaseDatePicker = false
                             }
                         ) {
@@ -212,32 +256,11 @@ fun AddItemScreen(
                         }
                     },
                     dismissButton = {
-                        TextButton(
-                            onClick = {
-                                showPurchaseDatePicker = false
-                            }
-                        ) {
+                        TextButton(onClick = { showPurchaseDatePicker = false }) {
                             Text("Cancelar")
                         }
                     }
-                ) {
-                    androidx.compose.material3.DatePicker(
-                        state = rememberDatePickerState(
-                            initialSelectedDateMillis = purchaseDateLocal?.toEpochDay()?.times(86400000)
-                                ?: System.currentTimeMillis()
-                        ),
-                        onDateChange = { millis ->
-                            if (millis != null) {
-                                val date = LocalDate.ofEpochDay(millis / 86400000)
-                                purchaseDateLocal = date
-                                purchaseDate = date.format(DATE_FORMAT)
-                                purchaseDateError = false
-                                // Resetear predicción si cambia la fecha
-                                showPredictionTip = false
-                            }
-                        }
-                    )
-                }
+                )
             }
 
             // Tip de predicción
@@ -278,7 +301,7 @@ fun AddItemScreen(
                 }
             }
 
-            // Fecha de vencimiento con calendario
+            // Fecha de vencimiento con botón de calendario
             OutlinedTextField(
                 value = expiryDate,
                 onValueChange = {},
@@ -302,11 +325,34 @@ fun AddItemScreen(
 
             // Dialog selector de fecha de expiración
             if (showExpiryDatePicker) {
-                DatePickerDialog(
+                var expYear by remember { mutableStateOf(LocalDate.now().year) }
+                var expMonth by remember { mutableStateOf(LocalDate.now().monthValue - 1) }
+                var expDay by remember { mutableStateOf(LocalDate.now().dayOfMonth) }
+                
+                AlertDialog(
                     onDismissRequest = { showExpiryDatePicker = false },
+                    title = { Text("Fecha de vencimiento") },
+                    text = {
+                        android.widget.DatePicker(
+                            androidx.compose.ui.platform.LocalContext.current,
+                            null,
+                            android.R.attr.datePickerStyle
+                        ).apply {
+                            updateDate(expYear, expMonth, expDay)
+                            setOnDateChangedListener { _, year, month, day ->
+                                expYear = year
+                                expMonth = month
+                                expDay = day
+                            }
+                        }
+                    },
                     confirmButton = {
                         TextButton(
                             onClick = {
+                                val date = String.format("%04d-%02d-%02d", expYear, expMonth + 1, expDay)
+                                expiryDate = date
+                                expiryDateError = false
+                                showPredictionTip = false
                                 showExpiryDatePicker = false
                             }
                         ) {
@@ -314,32 +360,11 @@ fun AddItemScreen(
                         }
                     },
                     dismissButton = {
-                        TextButton(
-                            onClick = {
-                                showExpiryDatePicker = false
-                            }
-                        ) {
+                        TextButton(onClick = { showExpiryDatePicker = false }) {
                             Text("Cancelar")
                         }
                     }
-                ) {
-                    androidx.compose.material3.DatePicker(
-                        state = rememberDatePickerState(
-                            initialSelectedDateMillis = expiryDateLocal?.toEpochDay()?.times(86400000)
-                                ?: System.currentTimeMillis()
-                        ),
-                        onDateChange = { millis ->
-                            if (millis != null) {
-                                val date = LocalDate.ofEpochDay(millis / 86400000)
-                                expiryDateLocal = date
-                                expiryDate = date.format(DATE_FORMAT)
-                                expiryDateError = false
-                                // Si el usuario selecciona fecha manualmente, ocultar predicción
-                                showPredictionTip = false
-                            }
-                        }
-                    )
-                }
+                )
             }
 
             // Error general

@@ -80,7 +80,6 @@ dependencies {
 
     // ML Kit para OCR (reconocimiento de texto)
     implementation(libs.mlkit.text.recognition)
-    implementation(libs.mlkit.text.recognition.devanagiri)
 
     // Firebase
     implementation(platform(libs.firebase.bom))

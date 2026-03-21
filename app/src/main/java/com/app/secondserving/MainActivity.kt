@@ -104,7 +104,11 @@ fun MyApplicationApp() {
     if (showAddItem) {
         AddItemScreen(
             viewModel = inventoryViewModel,
-            onNavigateBack = { showAddItem = false }
+            onNavigateBack = { showAddItem = false },
+            onOpenScanner = {
+                showAddItem = false
+                showScanReceipt = true
+            }
         )
         return
     }
