@@ -42,7 +42,8 @@ private val CATEGORIES = listOf("Todos", "Frutas", "Verduras", "Lácteos", "Carn
 @Composable
 fun InventoryScreen(
     viewModel: InventoryViewModel,
-    weatherViewModel: WeatherViewModel = viewModel()
+    weatherViewModel: WeatherViewModel = viewModel(),
+    onItemClick: (InventoryItemUi, String) -> Unit = { _, _ -> }
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
@@ -79,7 +80,6 @@ fun InventoryScreen(
     ) {
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Header
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -116,7 +116,6 @@ fun InventoryScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Banner del clima
         when (val ws = weatherState) {
             is WeatherUiState.Success -> {
                 Surface(
@@ -157,7 +156,6 @@ fun InventoryScreen(
             else -> {}
         }
 
-        // Search bar
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { viewModel.onSearchQueryChange(it) },
@@ -178,7 +176,6 @@ fun InventoryScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Category chips
         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             items(CATEGORIES) { category ->
                 val selected = category == selectedCategory
@@ -254,9 +251,11 @@ fun InventoryScreen(
                         contentPadding = PaddingValues(bottom = 16.dp)
                     ) {
                         items(state.items) { item ->
+                            val tip = weatherViewModel.getStorageTip(item.name)
                             InventoryCard(
                                 item = item,
-                                storageTip = weatherViewModel.getStorageTip(item.name)
+                                storageTip = tip,
+                                onClick = { onItemClick(item, tip) }
                             )
                         }
                     }
@@ -267,7 +266,11 @@ fun InventoryScreen(
 }
 
 @Composable
-private fun InventoryCard(item: InventoryItemUi, storageTip: String) {
+private fun InventoryCard(
+    item: InventoryItemUi,
+    storageTip: String,
+    onClick: () -> Unit = {}
+) {
     val urgencyColor = when (item.urgency) {
         Urgency.RED -> UrgencyRed
         Urgency.YELLOW -> UrgencyYellow
@@ -277,6 +280,7 @@ private fun InventoryCard(item: InventoryItemUi, storageTip: String) {
     val progress = (maxOf(0L, item.daysRemaining) / 14f).coerceIn(0f, 1f)
 
     Card(
+        onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = CardColor),
