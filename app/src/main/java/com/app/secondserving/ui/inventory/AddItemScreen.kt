@@ -8,6 +8,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,11 +18,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import com.app.secondserving.data.ShelfLifePredictor
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 
 private val GreenDark = Color(0xFF386641)
 private val BackgroundColor = Color(0xFFF5F5F0)
 private val CATEGORIES = listOf("Frutas", "Verduras", "Lácteos", "Carnes", "Otros")
+private val DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -47,6 +52,12 @@ fun AddItemScreen(
     var showPredictionTip by remember { mutableStateOf(false) }
     var predictedExpiryDate by remember { mutableStateOf("") }
     var storageTip by remember { mutableStateOf("") }
+
+    // Selectores de fecha con calendario
+    var showPurchaseDatePicker by remember { mutableStateOf(false) }
+    var showExpiryDatePicker by remember { mutableStateOf(false) }
+    var purchaseDateLocal by remember { mutableStateOf<LocalDate?>(null) }
+    var expiryDateLocal by remember { mutableStateOf<LocalDate?>(null) }
 
     // Actualizar predicción cuando cambia categoría o fecha de compra
     LaunchedEffect(category, purchaseDate) {
@@ -165,21 +176,69 @@ fun AddItemScreen(
                 singleLine = true
             )
 
-            // Fecha de compra
+            // Fecha de compra con calendario
             OutlinedTextField(
                 value = purchaseDate,
-                onValueChange = { purchaseDate = it; purchaseDateError = false },
-                label = { Text("Fecha de compra * (YYYY-MM-DD)") },
+                onValueChange = {},
+                readOnly = true,
+                label = { Text("Fecha de compra *") },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 isError = purchaseDateError,
-                supportingText = { if (purchaseDateError) Text("Formato: 2025-04-01") },
+                supportingText = { if (purchaseDateError) Text("Campo requerido") },
+                trailingIcon = {
+                    IconButton(onClick = { showPurchaseDatePicker = true }) {
+                        Icon(Icons.Default.CalendarToday, contentDescription = "Seleccionar fecha")
+                    }
+                },
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = GreenDark,
                     focusedLabelColor = GreenDark
                 ),
                 singleLine = true
             )
+
+            // Dialog selector de fecha de compra
+            if (showPurchaseDatePicker) {
+                DatePickerDialog(
+                    onDismissRequest = { showPurchaseDatePicker = false },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                showPurchaseDatePicker = false
+                            }
+                        ) {
+                            Text("OK")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(
+                            onClick = {
+                                showPurchaseDatePicker = false
+                            }
+                        ) {
+                            Text("Cancelar")
+                        }
+                    }
+                ) {
+                    androidx.compose.material3.DatePicker(
+                        state = rememberDatePickerState(
+                            initialSelectedDateMillis = purchaseDateLocal?.toEpochDay()?.times(86400000)
+                                ?: System.currentTimeMillis()
+                        ),
+                        onDateChange = { millis ->
+                            if (millis != null) {
+                                val date = LocalDate.ofEpochDay(millis / 86400000)
+                                purchaseDateLocal = date
+                                purchaseDate = date.format(DATE_FORMAT)
+                                purchaseDateError = false
+                                // Resetear predicción si cambia la fecha
+                                showPredictionTip = false
+                            }
+                        }
+                    )
+                }
+            }
 
             // Tip de predicción
             if (showPredictionTip && predictedExpiryDate.isNotBlank()) {
@@ -219,21 +278,69 @@ fun AddItemScreen(
                 }
             }
 
-            // Fecha de vencimiento
+            // Fecha de vencimiento con calendario
             OutlinedTextField(
                 value = expiryDate,
-                onValueChange = { expiryDate = it; expiryDateError = false },
-                label = { Text("Fecha de vencimiento * (YYYY-MM-DD)") },
+                onValueChange = {},
+                readOnly = true,
+                label = { Text("Fecha de vencimiento *") },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 isError = expiryDateError,
-                supportingText = { if (expiryDateError) Text("Formato: 2025-04-01") },
+                supportingText = { if (expiryDateError) Text("Campo requerido") },
+                trailingIcon = {
+                    IconButton(onClick = { showExpiryDatePicker = true }) {
+                        Icon(Icons.Default.CalendarToday, contentDescription = "Seleccionar fecha")
+                    }
+                },
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = GreenDark,
                     focusedLabelColor = GreenDark
                 ),
                 singleLine = true
             )
+
+            // Dialog selector de fecha de expiración
+            if (showExpiryDatePicker) {
+                DatePickerDialog(
+                    onDismissRequest = { showExpiryDatePicker = false },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                showExpiryDatePicker = false
+                            }
+                        ) {
+                            Text("OK")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(
+                            onClick = {
+                                showExpiryDatePicker = false
+                            }
+                        ) {
+                            Text("Cancelar")
+                        }
+                    }
+                ) {
+                    androidx.compose.material3.DatePicker(
+                        state = rememberDatePickerState(
+                            initialSelectedDateMillis = expiryDateLocal?.toEpochDay()?.times(86400000)
+                                ?: System.currentTimeMillis()
+                        ),
+                        onDateChange = { millis ->
+                            if (millis != null) {
+                                val date = LocalDate.ofEpochDay(millis / 86400000)
+                                expiryDateLocal = date
+                                expiryDate = date.format(DATE_FORMAT)
+                                expiryDateError = false
+                                // Si el usuario selecciona fecha manualmente, ocultar predicción
+                                showPredictionTip = false
+                            }
+                        }
+                    )
+                }
+            }
 
             // Error general
             if (addItemState is AddItemUiState.Error) {
