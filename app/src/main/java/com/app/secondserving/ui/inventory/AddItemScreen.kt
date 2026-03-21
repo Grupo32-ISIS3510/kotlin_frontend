@@ -17,6 +17,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.app.secondserving.data.ShelfLifePredictor
 
 private val GreenDark = Color(0xFF386641)
 private val BackgroundColor = Color(0xFFF5F5F0)
@@ -41,6 +42,23 @@ fun AddItemScreen(
     var quantityError by remember { mutableStateOf(false) }
     var purchaseDateError by remember { mutableStateOf(false) }
     var expiryDateError by remember { mutableStateOf(false) }
+
+    // Predicción automática de fecha de expiración
+    var showPredictionTip by remember { mutableStateOf(false) }
+    var predictedExpiryDate by remember { mutableStateOf("") }
+    var storageTip by remember { mutableStateOf("") }
+
+    // Actualizar predicción cuando cambia categoría o fecha de compra
+    LaunchedEffect(category, purchaseDate) {
+        if (purchaseDate.isNotBlank() && expiryDate.isBlank()) {
+            predictedExpiryDate = ShelfLifePredictor.predictExpiryDate(
+                purchaseDateStr = purchaseDate,
+                category = category
+            )
+            storageTip = ShelfLifePredictor.getStorageRecommendation(category)
+            showPredictionTip = true
+        }
+    }
 
     // Navegar atrás al éxito
     LaunchedEffect(addItemState) {
@@ -163,6 +181,44 @@ fun AddItemScreen(
                 singleLine = true
             )
 
+            // Tip de predicción
+            if (showPredictionTip && predictedExpiryDate.isNotBlank()) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0xFFE8F5E9),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, GreenDark.copy(alpha = 0.3f))
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = "💡 Predicción de vida útil",
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 14.sp,
+                            color = GreenDark
+                        )
+                        Text(
+                            text = "Fecha de expiración estimada: $predictedExpiryDate",
+                            fontSize = 13.sp,
+                            color = Color(0xFF2E7D32)
+                        )
+                        Text(
+                            text = "Almacenamiento recomendado: ${storageTip.ifBlank { "ambiente" }}",
+                            fontSize = 13.sp,
+                            color = Color(0xFF555555)
+                        )
+                        Text(
+                            text = "Puedes editar la fecha manualmente si lo prefieres",
+                            fontSize = 12.sp,
+                            color = Color(0xFF888888),
+                            fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                        )
+                    }
+                }
+            }
+
             // Fecha de vencimiento
             OutlinedTextField(
                 value = expiryDate,
@@ -200,7 +256,14 @@ fun AddItemScreen(
                     nameError = name.isBlank()
                     quantityError = quantity.toDoubleOrNull() == null
                     purchaseDateError = purchaseDate.isBlank()
-                    expiryDateError = expiryDate.isBlank()
+                    
+                    // Usar predicción si no hay fecha de expiración
+                    val finalExpiryDate = if (expiryDate.isBlank() && predictedExpiryDate.isNotBlank()) {
+                        predictedExpiryDate
+                    } else {
+                        expiryDateError = expiryDate.isBlank()
+                        expiryDate
+                    }
 
                     if (!nameError && !quantityError && !purchaseDateError && !expiryDateError) {
                         viewModel.createInventoryItem(
@@ -208,7 +271,7 @@ fun AddItemScreen(
                             category = category,
                             quantity = quantity.toDouble(),
                             purchaseDate = purchaseDate.trim(),
-                            expiryDate = expiryDate.trim()
+                            expiryDate = finalExpiryDate
                         )
                     }
                 },
