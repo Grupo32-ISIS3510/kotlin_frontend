@@ -70,8 +70,18 @@ fun MyApplicationApp() {
         }
     }
 
+    val app = androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner.current?.let {
+        it as? ComponentActivity
+    }?.application as? SecondServingApp
+
     val inventoryViewModel: InventoryViewModel = viewModel(
-        factory = InventoryViewModelFactory(InventoryRepository())
+        factory = InventoryViewModelFactory(
+            app?.inventoryRepository ?: InventoryRepository(
+                com.app.secondserving.data.local.AppDatabase.getDatabase(
+                    androidx.compose.ui.platform.LocalContext.current.applicationContext
+                )
+            )
+        )
     )
 
     if (showAddItem) {

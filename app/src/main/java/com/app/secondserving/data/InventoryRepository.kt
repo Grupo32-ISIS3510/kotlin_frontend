@@ -1,14 +1,160 @@
 package com.app.secondserving.data
 
-import com.app.secondserving.data.network.InventoryItem
+import com.app.secondserving.data.local.AppDatabase
+import com.app.secondserving.data.local.FoodItemDao
+import com.app.secondserving.data.local.FoodItemEntity
 import com.app.secondserving.data.network.InventoryItemRequest
+import com.app.secondserving.data.network.InventoryServiceAdapter
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 
-class InventoryRepository(private val dataSource: InventoryDataSource = InventoryDataSource()) {
+/**
+ * Inventory Repository - Single Source of Truth.
+ * Patrón Repository:
+ * - Única fuente de verdad para datos de inventario
+ * - Decide si leer de red (backend) o caché local (Room)
+ * - Los ViewModel solo dependen de este repositorio
+ */
+class InventoryRepository(
+    private val database: AppDatabase,
+    private val serviceAdapter: InventoryServiceAdapter = InventoryServiceAdapter()
+) {
 
-    suspend fun getInventory(): Result<List<InventoryItem>> {
-        return dataSource.getInventory()
+    private val dao: FoodItemDao = database.foodItemDao()
+
+    /**
+     * Obtiene todos los items del inventario.
+     * Estrategia: Primero intenta obtener del backend, luego guarda en caché local.
+     * Si falla la red, devuelve datos locales.
+     */
+    suspend fun getInventory(): Result<List<FoodItemEntity>> {
+        return try {
+            // Intentar obtener del backend
+            val remoteResult = serviceAdapter.getInventory()
+            when (remoteResult) {
+                is Result.Success -> {
+                    // Guardar en caché local
+                    dao.insertAllItems(remoteResult.data)
+                    remoteResult
+                }
+                is Result.Error -> {
+                    // Fallback a datos locales
+                    val localItems = dao.getAllItems().first()
+                    if (localItems.isNotEmpty()) {
+                        Result.Success(localItems)
+                    } else {
+                        remoteResult
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            // Fallback a datos locales en caso de excepción
+            val localItems = dao.getAllItems().first()
+            if (localItems.isNotEmpty()) {
+                Result.Success(localItems)
+            } else {
+                Result.Error(e)
+            }
+        }
     }
-    suspend fun createInventoryItem(request: InventoryItemRequest): Result<InventoryItem> {
-        return dataSource.createInventoryItem(request)
+
+    /**
+     * Obtiene items como Flow reactivo (observa cambios en la DB local).
+     */
+    fun getInventoryFlow(): Flow<List<FoodItemEntity>> {
+        return dao.getAllItems()
+    }
+
+    /**
+     * Obtiene items que expiran pronto (próximos 3 días).
+     */
+    fun getExpiringSoonItems(): Flow<List<FoodItemEntity>> {
+        return dao.getExpiringSoonItems()
+    }
+
+    /**
+     * Obtiene items ya expirados.
+     */
+    fun getExpiredItems(): Flow<List<FoodItemEntity>> {
+        return dao.getExpiredItems()
+    }
+
+    /**
+     * Crea un nuevo item en el inventario.
+     * Estrategia: Guarda en backend primero, luego en caché local.
+     */
+    suspend fun createInventoryItem(request: InventoryItemRequest): Result<FoodItemEntity> {
+        return try {
+            val remoteResult = serviceAdapter.createInventoryItem(request)
+            when (remoteResult) {
+                is Result.Success -> {
+                    // Guardar en caché local
+                    dao.insertItem(remoteResult.data)
+                    remoteResult
+                }
+                is Result.Error -> remoteResult
+            }
+        } catch (e: Exception) {
+            Result.Error(e)
+        }
+    }
+
+    /**
+     * Actualiza un item existente.
+     */
+    suspend fun updateInventoryItem(item: FoodItemEntity): Result<FoodItemEntity> {
+        return try {
+            val updatedItem = item.copy(updatedAt = System.currentTimeMillis())
+            val remoteResult = serviceAdapter.updateInventoryItem(updatedItem)
+            when (remoteResult) {
+                is Result.Success -> {
+                    dao.updateItem(updatedItem)
+                    remoteResult
+                }
+                is Result.Error -> remoteResult
+            }
+        } catch (e: Exception) {
+            Result.Error(e)
+        }
+    }
+
+    /**
+     * Elimina un item del inventario.
+     */
+    suspend fun deleteInventoryItem(itemId: String): Result<Unit> {
+        return try {
+            val remoteResult = serviceAdapter.deleteInventoryItem(itemId)
+            when (remoteResult) {
+                is Result.Success -> {
+                    dao.deleteItemById(itemId)
+                    remoteResult
+                }
+                is Result.Error -> remoteResult
+            }
+        } catch (e: Exception) {
+            Result.Error(e)
+        }
+    }
+
+    /**
+     * Busca items por nombre o código de barras.
+     */
+    fun searchItems(query: String): Flow<List<FoodItemEntity>> {
+        return dao.searchItems("%$query%")
+    }
+
+    /**
+     * Obtiene items por categoría.
+     */
+    fun getItemsByCategory(category: String): Flow<List<FoodItemEntity>> {
+        return dao.getItemsByCategory(category)
+    }
+
+    /**
+     * Sincroniza el inventario local con el backend.
+     * Útil para refresh manual o al iniciar la app.
+     */
+    suspend fun syncInventory(): Result<List<FoodItemEntity>> {
+        return getInventory()
     }
 }
