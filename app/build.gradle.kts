@@ -74,6 +74,15 @@ dependencies {
     // Para Kotlin usa kapt
     kapt(libs.androidx.room.compiler)
 
+    // CameraX para escaneo OCR
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
+
+    // ML Kit para OCR (reconocimiento de texto)
+    implementation(libs.mlkit.text.recognition)
+    implementation(libs.mlkit.text.recognition.devanagiri)
+
     // Firebase
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.analytics)
