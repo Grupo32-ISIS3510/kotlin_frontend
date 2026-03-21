@@ -50,19 +50,23 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             _weatherState.value = WeatherUiState.Loading
             try {
-                val location = fusedLocationClient.getCurrentLocation(
-                    Priority.PRIORITY_BALANCED_POWER_ACCURACY, null
-                ).await()
-
-                if (location != null) {
-                    val weather = weatherService.getWeather(location.latitude, location.longitude)
+                // Intentar con lastLocation primero
+                val lastLocation = fusedLocationClient.lastLocation.await()
+                if (lastLocation != null) {
+                    val weather = weatherService.getWeather(lastLocation.latitude, lastLocation.longitude)
                     if (weather != null) {
                         _weatherState.value = WeatherUiState.Success(weather)
                     } else {
                         _weatherState.value = WeatherUiState.Error("No se pudo obtener el clima")
                     }
                 } else {
-                    _weatherState.value = WeatherUiState.Error("No se pudo obtener la ubicación")
+                    // Fallback: usar coordenadas de Bogotá si no hay ubicación
+                    val weather = weatherService.getWeather(4.7110, -74.0721)
+                    if (weather != null) {
+                        _weatherState.value = WeatherUiState.Success(weather)
+                    } else {
+                        _weatherState.value = WeatherUiState.Error("No se pudo obtener el clima")
+                    }
                 }
             } catch (e: Exception) {
                 _weatherState.value = WeatherUiState.Error("Error: ${e.message}")

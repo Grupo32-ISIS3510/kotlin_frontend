@@ -26,9 +26,12 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.app.secondserving.data.InventoryRepository
 import com.app.secondserving.ui.inventory.AddItemScreen
+import com.app.secondserving.ui.inventory.InventoryItemUi
 import com.app.secondserving.ui.inventory.InventoryScreen
 import com.app.secondserving.ui.inventory.InventoryViewModel
 import com.app.secondserving.ui.inventory.InventoryViewModelFactory
+import com.app.secondserving.ui.inventory.ItemDetailScreen
+import com.app.secondserving.ui.inventory.WeatherViewModel
 import com.app.secondserving.ui.theme.MyApplicationTheme
 
 class MainActivity : ComponentActivity() {
@@ -54,6 +57,8 @@ enum class AppDestinations(val label: String, val icon: ImageVector) {
 fun MyApplicationApp() {
     var currentDestination by rememberSaveable { mutableStateOf(AppDestinations.DESPENSA) }
     var showAddItem by remember { mutableStateOf(false) }
+    var selectedItem by remember { mutableStateOf<InventoryItemUi?>(null) }
+    var selectedItemTip by remember { mutableStateOf("") }
     // Pedir permiso de notificaciones (Android 13+)
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -73,6 +78,17 @@ fun MyApplicationApp() {
         AddItemScreen(
             viewModel = inventoryViewModel,
             onNavigateBack = { showAddItem = false }
+        )
+        return
+    }
+
+    if (selectedItem != null) {
+        val weatherVm: WeatherViewModel = viewModel()
+        ItemDetailScreen(
+            item = selectedItem!!,
+            storageTip = selectedItemTip,
+            weatherState = weatherVm.weatherState.collectAsState().value,
+            onNavigateBack = { selectedItem = null }
         )
         return
     }
@@ -122,7 +138,13 @@ fun MyApplicationApp() {
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding)) {
             when (currentDestination) {
-                AppDestinations.DESPENSA -> InventoryScreen(viewModel = inventoryViewModel)
+                AppDestinations.DESPENSA -> InventoryScreen(
+                    viewModel = inventoryViewModel,
+                    onItemClick = { item, tip ->
+                        selectedItem = item
+                        selectedItemTip = tip
+                    }
+                )
                 AppDestinations.INICIO -> PlaceholderScreen("Inicio")
                 AppDestinations.RECETAS -> PlaceholderScreen("Recetas")
                 AppDestinations.PERFIL -> PlaceholderScreen("Perfil")
