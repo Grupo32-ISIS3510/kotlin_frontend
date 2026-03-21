@@ -21,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -29,6 +30,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.core.app.NotificationCompat
+import android.app.NotificationChannel
+import android.app.NotificationManager
 
 private val GreenDark = Color(0xFF386641)
 private val UrgencyRed = Color(0xFFE53935)
@@ -49,6 +53,7 @@ fun InventoryScreen(
     val searchQuery by viewModel.searchQuery.collectAsState()
     val selectedCategory by viewModel.selectedCategory.collectAsState()
     val weatherState by weatherViewModel.weatherState.collectAsState()
+    val context = LocalContext.current
 
     val locationLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -104,7 +109,40 @@ fun InventoryScreen(
                 color = Color.White,
                 shadowElevation = 2.dp
             ) {
-                IconButton(onClick = {}) {
+                IconButton(onClick = {
+                    val manager = context.getSystemService(NotificationManager::class.java)
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                        val channel = NotificationChannel(
+                            "expiry_alerts",
+                            "Alertas de vencimiento",
+                            NotificationManager.IMPORTANCE_HIGH
+                        )
+                        manager.createNotificationChannel(channel)
+                    }
+
+                    val expiring = if (uiState is InventoryUiState.Success) {
+                        (uiState as InventoryUiState.Success).items
+                            .filter { it.daysRemaining <= 1 }
+                    } else emptyList()
+
+                    val bodyText = if (expiring.isNotEmpty()) {
+                        expiring.joinToString("\n") { item ->
+                            "• ${item.name} — ${if (item.daysRemaining <= 0) "vence hoy" else "1 día restante"}"
+                        }
+                    } else {
+                        "Todos tus alimentos están en buen estado 🎉"
+                    }
+
+                    val notification = NotificationCompat.Builder(context, "expiry_alerts")
+                        .setSmallIcon(android.R.drawable.ic_dialog_info)
+                        .setContentTitle("⚠️ Alimentos próximos a vencer")
+                        .setContentText(bodyText)
+                        .setStyle(NotificationCompat.BigTextStyle().bigText(bodyText))
+                        .setAutoCancel(true)
+                        .build()
+
+                    manager.notify(1001, notification)
+                }) {
                     Icon(
                         imageVector = Icons.Default.Notifications,
                         contentDescription = "Notificaciones",
