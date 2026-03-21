@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -25,12 +26,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.app.secondserving.data.InventoryRepository
+import com.app.secondserving.data.ScannedItem
 import com.app.secondserving.ui.inventory.AddItemScreen
 import com.app.secondserving.ui.inventory.InventoryItemUi
 import com.app.secondserving.ui.inventory.InventoryScreen
 import com.app.secondserving.ui.inventory.InventoryViewModel
 import com.app.secondserving.ui.inventory.InventoryViewModelFactory
 import com.app.secondserving.ui.inventory.ItemDetailScreen
+import com.app.secondserving.ui.inventory.ScanReceiptScreen
 import com.app.secondserving.ui.inventory.WeatherViewModel
 import com.app.secondserving.ui.theme.MyApplicationTheme
 
@@ -57,6 +60,7 @@ enum class AppDestinations(val label: String, val icon: ImageVector) {
 fun MyApplicationApp() {
     var currentDestination by rememberSaveable { mutableStateOf(AppDestinations.DESPENSA) }
     var showAddItem by remember { mutableStateOf(false) }
+    var showScanReceipt by remember { mutableStateOf(false) }
     var selectedItem by remember { mutableStateOf<InventoryItemUi?>(null) }
     var selectedItemTip by remember { mutableStateOf("") }
     // Pedir permiso de notificaciones (Android 13+)
@@ -83,6 +87,19 @@ fun MyApplicationApp() {
             )
         )
     )
+
+    // Pantalla de escanear factura
+    if (showScanReceipt) {
+        ScanReceiptScreen(
+            onItemsScanned = { items, purchaseDate ->
+                // Aquí se podrían agregar los items escaneados al inventario
+                showScanReceipt = false
+                showAddItem = true // Ir a pantalla de agregar para confirmar
+            },
+            onNavigateBack = { showScanReceipt = false }
+        )
+        return
+    }
 
     if (showAddItem) {
         AddItemScreen(
@@ -133,15 +150,35 @@ fun MyApplicationApp() {
             }
         },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = {
-                    inventoryViewModel.resetAddItemState()
-                    showAddItem = true
-                },
-                containerColor = Color(0xFF386641),
-                contentColor = Color.White
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Agregar producto")
+                // Botón de escanear
+                FloatingActionButton(
+                    onClick = {
+                        inventoryViewModel.resetAddItemState()
+                        showScanReceipt = true
+                    },
+                    containerColor = Color(0xFFFF6F00),
+                    contentColor = Color.White,
+                    modifier = Modifier.size(56.dp)
+                ) {
+                    Icon(
+                        androidx.compose.material.icons.filled.QrCodeScanner,
+                        contentDescription = "Escanear factura"
+                    )
+                }
+                // Botón de agregar manual
+                FloatingActionButton(
+                    onClick = {
+                        inventoryViewModel.resetAddItemState()
+                        showAddItem = true
+                    },
+                    containerColor = Color(0xFF386641),
+                    contentColor = Color.White
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Agregar producto")
+                }
             }
         },
         floatingActionButtonPosition = FabPosition.Center
