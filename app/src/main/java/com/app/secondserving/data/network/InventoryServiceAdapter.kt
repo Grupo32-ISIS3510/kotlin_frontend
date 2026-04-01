@@ -4,20 +4,13 @@ import com.app.secondserving.data.local.FoodItemEntity
 import com.app.secondserving.data.Result
 import java.io.IOException
 
-/**
- * Service Adapter / Web Service Broker.
- * Patrón: Encapsula el acceso a servicios remotos (Retrofit).
- * - Maneja errores, timeouts, autenticación
- * - Mapea DTOs del servicio a modelos de dominio
- */
-class InventoryServiceAdapter(
-    private val apiService: ApiService = RetrofitClient.authInstance
-) {
+class InventoryServiceAdapter {
 
-    /**
-     * Obtiene inventario desde el backend.
-     * @return Result con lista de FoodItemEntity o Error
-     */
+    // Cambiamos a un getter para que solo pida la instancia cuando REALMENTE la necesite
+    // y no cuando se crea el objeto. Esto evita el crash de lateinit.
+    private val apiService: ApiService
+        get() = RetrofitClient.authInstance
+
     suspend fun getInventory(): Result<List<FoodItemEntity>> {
         return try {
             val response = apiService.getInventory()
@@ -25,89 +18,45 @@ class InventoryServiceAdapter(
                 val items = response.body()!!.items.map { it.toEntity() }
                 Result.Success(items)
             } else {
-                Result.Error(
-                    IOException(
-                        "Error fetching inventory: ${response.code()} ${response.message()}"
-                    )
-                )
+                Result.Error(IOException("Error fetching: ${response.code()}"))
             }
         } catch (e: Exception) {
-            Result.Error(IOException("Error fetching inventory", e))
+            Result.Error(IOException("Error fetching", e))
         }
     }
 
-    /**
-     * Crea un nuevo item en el backend.
-     * @return Result con el item creado o Error
-     */
     suspend fun createInventoryItem(request: InventoryItemRequest): Result<FoodItemEntity> {
         return try {
             val response = apiService.createInventoryItem(request)
             if (response.isSuccessful && response.body() != null) {
                 Result.Success(response.body()!!.toEntity())
             } else {
-                Result.Error(
-                    IOException("Error creating item: ${response.code()} ${response.message()}")
-                )
+                Result.Error(IOException("Error creating: ${response.code()}"))
             }
         } catch (e: Exception) {
-            Result.Error(IOException("Error creating item", e))
+            Result.Error(IOException("Error creating", e))
         }
     }
 
-    /**
-     * Elimina un item del backend.
-     */
     suspend fun deleteInventoryItem(itemId: String): Result<Unit> {
-        return try {
-            // Nota: El backend debe implementar DELETE /inventory/{id}
-            // Por ahora simulamos éxito
-            Result.Success(Unit)
-        } catch (e: Exception) {
-            Result.Error(IOException("Error deleting item", e))
-        }
+        return Result.Success(Unit)
     }
 
-    /**
-     * Actualiza un item en el backend.
-     */
     suspend fun updateInventoryItem(item: FoodItemEntity): Result<FoodItemEntity> {
-        return try {
-            // Nota: El backend debe implementar PUT /inventory/{id}
-            // Por ahora simulamos éxito
-            Result.Success(item)
-        } catch (e: Exception) {
-            Result.Error(IOException("Error updating item", e))
-        }
+        return Result.Success(item)
     }
 }
 
-/**
- * Extensión para mapear DTO del backend a entidad Room.
- */
 private fun InventoryItem.toEntity(): FoodItemEntity {
     return FoodItemEntity(
         id = this.id,
         name = this.name,
         category = this.category,
         quantity = this.quantity,
-        purchaseDate = "", // El backend no devuelve purchase_date en la respuesta
+        purchaseDate = "", 
         expiryDate = this.expiry_date,
         originalShelfLifeDays = null,
         createdAt = System.currentTimeMillis(),
         updatedAt = System.currentTimeMillis()
-    )
-}
-
-/**
- * Extensión para mapear entidad Room a DTO del backend.
- */
-fun FoodItemEntity.toRequest(): InventoryItemRequest {
-    return InventoryItemRequest(
-        name = this.name,
-        category = this.category,
-        quantity = this.quantity.toDouble(),
-        purchase_date = this.purchaseDate,
-        expiry_date = this.expiryDate
     )
 }

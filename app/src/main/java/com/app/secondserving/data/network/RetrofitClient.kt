@@ -8,8 +8,9 @@ import retrofit2.converter.gson.GsonConverterFactory
 
 object RetrofitClient {
 
-    // 10.0.2.2 accede al localhost de la PC desde el emulador Android
-    private const val BASE_URL = "http://10.0.2.2:8000/api/v1/"
+    // localhost con adb reverse funciona para emulador y dispositivo físico
+    // adb reverse tcp:8000 tcp:8000
+    private const val BASE_URL = "http://localhost:8000/api/v1/"
 
     private val logging = HttpLoggingInterceptor().apply {
         level = HttpLoggingInterceptor.Level.BODY

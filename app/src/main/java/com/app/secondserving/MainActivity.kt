@@ -7,9 +7,12 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Add
@@ -24,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.app.secondserving.data.InventoryRepository
 import com.app.secondserving.data.ScannedItem
@@ -92,9 +96,10 @@ fun MyApplicationApp() {
     if (showScanReceipt) {
         ScanReceiptScreen(
             onItemsScanned = { items, purchaseDate ->
-                // Aquí se podrían agregar los items escaneados al inventario
+                // Agregar los items escaneados al inventario en bulk
+                inventoryViewModel.createInventoryItemsBulk(items, purchaseDate)
                 showScanReceipt = false
-                showAddItem = true // Ir a pantalla de agregar para confirmar
+                currentDestination = AppDestinations.DESPENSA // Volver a despensa
             },
             onNavigateBack = { showScanReceipt = false }
         )
@@ -155,9 +160,10 @@ fun MyApplicationApp() {
         },
         floatingActionButton = {
             Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                // Botón de escanear
+                // Botón de escanear factura
                 FloatingActionButton(
                     onClick = {
                         inventoryViewModel.resetAddItemState()
@@ -168,7 +174,7 @@ fun MyApplicationApp() {
                     modifier = Modifier.size(56.dp)
                 ) {
                     Icon(
-                        androidx.compose.material.icons.filled.QrCodeScanner,
+                        imageVector = Icons.Default.QrCodeScanner,
                         contentDescription = "Escanear factura"
                     )
                 }
@@ -181,7 +187,10 @@ fun MyApplicationApp() {
                     containerColor = Color(0xFF386641),
                     contentColor = Color.White
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = "Agregar producto")
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Agregar producto"
+                    )
                 }
             }
         },

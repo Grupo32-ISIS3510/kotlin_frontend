@@ -5,6 +5,8 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.app.secondserving.data.InventoryRepository
 import com.app.secondserving.data.Result
+import com.app.secondserving.data.ScannedItem
+import com.app.secondserving.data.ShelfLifePredictor
 import com.app.secondserving.data.network.InventoryItemRequest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -61,7 +63,7 @@ class InventoryViewModel(private val repository: InventoryRepository) : ViewMode
                     val today = LocalDate.now()
                     allItems = result.data.map { item ->
                         val daysRemaining = try {
-                            val expiry = LocalDate.parse(item.expiry_date)
+                            val expiry = LocalDate.parse(item.expiryDate)
                             ChronoUnit.DAYS.between(today, expiry)
                         } catch (e: DateTimeParseException) {
                             0L
@@ -144,6 +146,47 @@ class InventoryViewModel(private val repository: InventoryRepository) : ViewMode
 
     fun resetAddItemState() {
         _addItemState.value = AddItemUiState.Idle
+    }
+
+    fun createInventoryItemsBulk(
+        items: List<ScannedItem>,
+        purchaseDate: String?
+    ) {
+        viewModelScope.launch {
+            _addItemState.value = AddItemUiState.Loading
+            
+            val today = purchaseDate ?: LocalDate.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE)
+            var successCount = 0
+            var errorCount = 0
+            
+            for (scannedItem in items) {
+                try {
+                    val request = InventoryItemRequest(
+                        name = scannedItem.name,
+                        category = scannedItem.category,
+                        quantity = 1.0,
+                        purchase_date = today,
+                        expiry_date = ShelfLifePredictor.predictExpiryDate(today, scannedItem.category)
+                    )
+                    when (repository.createInventoryItem(request)) {
+                        is Result.Success -> successCount++
+                        is Result.Error -> errorCount++
+                    }
+                } catch (e: Exception) {
+                    errorCount++
+                }
+            }
+            
+            if (errorCount == 0) {
+                _addItemState.value = AddItemUiState.Success
+                loadInventory()
+            } else if (successCount > 0) {
+                _addItemState.value = AddItemUiState.Success
+                loadInventory()
+            } else {
+                _addItemState.value = AddItemUiState.Error("No se pudieron agregar los productos")
+            }
+        }
     }
 }
 

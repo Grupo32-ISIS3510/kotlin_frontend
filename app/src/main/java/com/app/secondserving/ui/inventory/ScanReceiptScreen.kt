@@ -1,29 +1,17 @@
 package com.app.secondserving.ui.inventory
 
 import android.Manifest
-import android.content.Context
 import android.content.pm.PackageManager
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.net.Uri
-import android.util.Log
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.camera.core.CameraSelector
-import androidx.camera.core.ImageCapture
-import androidx.camera.core.ImageCaptureException
-import androidx.camera.core.Preview
-import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.camera.view.PreviewView
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.material.icons.filled.FlipCameraAndroid
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -31,22 +19,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.ui.window.Dialog
 import androidx.core.content.ContextCompat
-import com.app.secondserving.data.ReceiptScanResult
+import androidx.core.content.FileProvider
 import com.app.secondserving.data.ReceiptScanner
 import com.app.secondserving.data.ScannedItem
+import kotlinx.coroutines.launch
 import java.io.File
-import java.text.SimpleDateFormat
-import java.util.*
-import java.util.concurrent.Executor
-import kotlin.coroutines.resume
-import kotlin.coroutines.suspendCoroutine
 
 private val GreenDark = Color(0xFF386641)
 private val BackgroundColor = Color(0xFFF5F5F0)
@@ -58,7 +39,8 @@ fun ScanReceiptScreen(
     onNavigateBack: () -> Unit
 ) {
     val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
+    val scope = rememberCoroutineScope()
+    val scanner = remember { ReceiptScanner(context) }
 
     var hasCameraPermission by remember {
         mutableStateOf(
@@ -69,21 +51,48 @@ fun ScanReceiptScreen(
         )
     }
 
-    var showGalleryPicker by remember { mutableStateOf(false) }
+    var showCamera by remember { mutableStateOf(false) }
+    var capturedImageUri by remember { mutableStateOf<Uri?>(null) }
     var isProcessing by remember { mutableStateOf(false) }
-    var scanResult by remember { mutableStateOf<ReceiptScanResult?>(null) }
-    var showConfirmDialog by remember { mutableStateOf(false) }
+    var scannedResult by remember { mutableStateOf<Pair<List<ScannedItem>, String?>?>(null) }
 
-    val scanner = remember { ReceiptScanner(context) }
+    // Función para procesar la imagen con OCR
+    val processImage: (Uri) -> Unit = { uri ->
+        scope.launch {
+            isProcessing = true
+            try {
+                val result = scanner.scanReceipt(uri)
+                if (result.error != null) {
+                    Toast.makeText(context, result.error, Toast.LENGTH_LONG).show()
+                } else if (result.items.isNotEmpty()) {
+                    scannedResult = Pair(result.items, result.purchaseDate)
+                } else {
+                    Toast.makeText(context, "No se detectaron productos en la imagen", Toast.LENGTH_LONG).show()
+                }
+            } catch (e: Exception) {
+                Toast.makeText(context, "Error al procesar: ${e.message}", Toast.LENGTH_LONG).show()
+            } finally {
+                isProcessing = false
+            }
+        }
+    }
 
-    // Launcher para seleccionar imagen de galería
+    // Launcher para cámara
+    val cameraLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success && capturedImageUri != null) {
+            processImage(capturedImageUri!!)
+        }
+    }
+
+    // Launcher para galería
     val galleryLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
-        uri?.let { processImage(context, scanner, it, onItemsScanned) { result ->
-            scanResult = result
-            showConfirmDialog = true
-        }}
+        uri?.let {
+            processImage(it)
+        }
     }
 
     // Launcher para permiso de cámara
@@ -91,12 +100,32 @@ fun ScanReceiptScreen(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         hasCameraPermission = isGranted
+        if (isGranted) {
+            showCamera = true
+        }
     }
 
     // Solicitar permiso al iniciar
     LaunchedEffect(Unit) {
         if (!hasCameraPermission) {
             permissionLauncher.launch(Manifest.permission.CAMERA)
+        } else {
+            showCamera = true
+        }
+    }
+
+    // Abrir cámara cuando showCamera sea true
+    LaunchedEffect(showCamera) {
+        if (showCamera && hasCameraPermission) {
+            val photoFile = File(context.cacheDir, "receipt_capture.jpg")
+            val photoUri = FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                photoFile
+            )
+            capturedImageUri = photoUri
+            cameraLauncher.launch(photoUri)
+            showCamera = false
         }
     }
 
@@ -125,310 +154,119 @@ fun ScanReceiptScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
+                .padding(padding),
+            contentAlignment = Alignment.Center
         ) {
-            if (hasCameraPermission) {
-                CameraPreview(
-                    modifier = Modifier.fillMaxSize(),
-                    onImageCaptured = { uri ->
-                        processImage(context, scanner, uri, onItemsScanned) { result ->
-                            scanResult = result
-                            showConfirmDialog = true
-                        }
-                    }
-                )
-            } else {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.CameraAlt,
-                            contentDescription = null,
-                            modifier = Modifier.size(64.dp),
-                            tint = Color.Gray
-                        )
-                        Text(
-                            "Permiso de cámara requerido",
-                            color = Color.Gray,
-                            fontSize = 16.sp
-                        )
-                        Button(onClick = {
-                            permissionLauncher.launch(Manifest.permission.CAMERA)
-                        }) {
-                            Text("Conceder permiso")
-                        }
-                    }
-                }
-            }
-
-            // Controles en la parte inferior
-            Column(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                // Botón de galería
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    FloatingActionButton(
-                        onClick = { showGalleryPicker = true },
-                        containerColor = Color.White,
-                        contentColor = GreenDark,
-                        modifier = Modifier.size(56.dp)
-                    ) {
-                        Icon(Icons.Default.PhotoLibrary, contentDescription = "Seleccionar de galería")
-                    }
-
-                    // Botón de capturar
-                    FloatingActionButton(
-                        onClick = { /* Capturar se hace con el botón grande */ },
-                        containerColor = GreenDark,
-                        contentColor = Color.White,
-                        modifier = Modifier.size(72.dp),
-                        shape = CircleShape
-                    ) {
-                        Icon(Icons.Default.CameraAlt, contentDescription = "Capturar")
-                    }
-
-                    // Placeholder para balance
-                    Spacer(modifier = Modifier.size(56.dp))
-                }
-
-                Text(
-                    "Apunta a una factura o ticket para escanear los productos",
-                    color = Color.White,
-                    fontSize = 12.sp,
-                    modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(8.dp)).padding(8.dp)
-                )
-            }
-
-            // Loading overlay
-            if (isProcessing) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.7f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Card(
-                        modifier = Modifier.padding(32.dp),
-                        shape = RoundedCornerShape(16.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(24.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            CircularProgressIndicator(
-                                color = GreenDark,
-                                modifier = Modifier.size(48.dp)
-                            )
-                            Text(
-                                "Procesando factura...",
-                                fontWeight = FontWeight.Medium,
-                                fontSize = 16.sp
-                            )
-                            Text(
-                                "Extrayendo productos con OCR",
-                                color = Color.Gray,
-                                fontSize = 13.sp
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // Dialog para seleccionar de galería
-    if (showGalleryPicker) {
-        galleryLauncher.launch("image/*")
-        showGalleryPicker = false
-    }
-
-    // Dialog de confirmación
-    if (showConfirmDialog && scanResult != null) {
-        ScanResultDialog(
-            result = scanResult!!,
-            onConfirm = {
-                onItemsScanned(scanResult!!.items, scanResult!!.purchaseDate)
-                showConfirmDialog = false
-                onNavigateBack()
-            },
-            onDismiss = {
-                showConfirmDialog = false
-                scanResult = null
-            }
-        )
-    }
-}
-
-@Composable
-private fun CameraPreview(
-    modifier: Modifier = Modifier,
-    onImageCaptured: (Uri) -> Unit
-) {
-    val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
-    val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
-
-    var imageCapture by remember { mutableStateOf<ImageCapture?>(null) }
-    var lensFacing by remember { mutableStateOf(CameraSelector.LENS_FACING_BACK) }
-
-    LaunchedEffect(Unit) {
-        val cameraProvider = cameraProviderFuture.get()
-        val preview = Preview.Builder().build().also {
-            it.setSurfaceProvider(
-                AndroidView(
-                    factory = { ctx ->
-                        PreviewView(ctx).apply {
-                            scaleType = PreviewView.ScaleType.FILL_CENTER
-                        }
+            if (scannedResult != null) {
+                // Navigate to review screen with scanned items
+                ReviewScannedItemsScreen(
+                    scannedItems = scannedResult!!.first,
+                    purchaseDate = scannedResult!!.second,
+                    onSaveItems = { items, date ->
+                        onItemsScanned(items, date)
                     },
-                    modifier = modifier
-                ).findViewById<PreviewView>(android.R.id.content)?.surfaceProvider
-                    ?: it.surfaceProvider
-            )
-        }
-
-        imageCapture = ImageCapture.Builder()
-            .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
-            .build()
-
-        val cameraSelector = CameraSelector.Builder()
-            .requireLensFacing(lensFacing)
-            .build()
-
-        try {
-            cameraProvider.unbindAll()
-            cameraProvider.bindToLifecycle(
-                lifecycleOwner,
-                cameraSelector,
-                preview,
-                imageCapture
-            )
-        } catch (e: Exception) {
-            Log.e("CameraPreview", "Error binding camera", e)
-        }
-    }
-
-    // Botón para capturar (se maneja desde el padre)
-    LaunchedEffect(imageCapture) {
-        // El botón de capturar está en el padre
-    }
-}
-
-private fun processImage(
-    context: Context,
-    scanner: ReceiptScanner,
-    uri: Uri,
-    onItemsScanned: (List<ScannedItem>, String?) -> Unit,
-    onResult: (ReceiptScanResult) -> Unit
-) {
-    kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
-        try {
-            val result = scanner.scanReceipt(uri)
-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                onResult(result)
-            }
-        } catch (e: Exception) {
-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                Toast.makeText(
-                    context,
-                    "Error procesando imagen: ${e.message}",
-                    Toast.LENGTH_LONG
-                ).show()
-            }
-        }
-    }
-}
-
-@Composable
-private fun ScanResultDialog(
-    result: ReceiptScanResult,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Productos Detectados") },
-        text = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                if (result.error != null) {
-                    Text(
-                        result.error,
-                        color = MaterialTheme.colorScheme.error
+                    onNavigateBack = { scannedResult = null }
+                )
+            } else if (isProcessing) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator(color = GreenDark)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Procesando factura con OCR...", color = GreenDark)
+                }
+            } else {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(24.dp)
+                ) {
+                    Icon(
+                        Icons.Default.CameraAlt,
+                        contentDescription = null,
+                        modifier = Modifier.size(80.dp),
+                        tint = GreenDark
                     )
-                } else if (result.items.isEmpty()) {
-                    Text("No se detectaron productos. Intenta con otra imagen.")
-                } else {
-                    Text("Se detectaron ${result.items.size} productos:")
-                    result.items.forEach { item ->
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(8.dp)
+
+                    Text(
+                        "Escanea una factura o ticket",
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 16.sp,
+                        color = Color(0xFF333333)
+                    )
+
+                    Text(
+                        "Usa la cámara para extraer los productos automáticamente",
+                        color = Color.Gray,
+                        fontSize = 14.sp,
+                        modifier = Modifier.padding(horizontal = 32.dp)
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Botones de acción
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Botón galería
+                        FloatingActionButton(
+                            onClick = { galleryLauncher.launch("image/*") },
+                            containerColor = Color.White,
+                            contentColor = GreenDark,
+                            modifier = Modifier.size(64.dp)
                         ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Text(
-                                    item.name,
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 14.sp
-                                )
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(
-                                        item.category,
-                                        color = Color.Gray,
-                                        fontSize = 12.sp
-                                    )
-                                    if (item.price != null) {
-                                        Text(
-                                            "$${item.price}",
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 14.sp
-                                        )
-                                    }
-                                }
-                            }
+                            Icon(
+                                Icons.Default.PhotoLibrary,
+                                contentDescription = "Galería",
+                                modifier = Modifier.size(32.dp)
+                            )
                         }
-                    }
-                }
 
-                if (result.purchaseDate != null) {
-                    Spacer(modifier = Modifier.height(8.dp))
+                        // Botón cámara
+                        FloatingActionButton(
+                            onClick = {
+                                if (hasCameraPermission) {
+                                    showCamera = true
+                                } else {
+                                    permissionLauncher.launch(Manifest.permission.CAMERA)
+                                }
+                            },
+                            containerColor = GreenDark,
+                            contentColor = Color.White,
+                            modifier = Modifier.size(80.dp),
+                            shape = CircleShape
+                        ) {
+                            Icon(
+                                Icons.Default.CameraAlt,
+                                contentDescription = "Cámara",
+                                modifier = Modifier.size(40.dp)
+                            )
+                        }
+
+                        // Placeholder para balance simétrico
+                        Box(modifier = Modifier.size(64.dp))
+                    }
+
                     Text(
-                        "Fecha de compra: ${result.purchaseDate}",
-                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
-                        color = Color.Gray
+                        "Toca el icono central para capturar",
+                        color = GreenDark,
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 14.sp
                     )
                 }
             }
-        },
-        confirmButton = {
-            Button(onClick = onConfirm) {
-                Text("Agregar al inventario")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancelar")
-            }
         }
-    )
+    }
+
+    // Handle system back button
+    BackHandler(enabled = scannedResult != null) {
+        scannedResult = null
+    }
+    BackHandler(enabled = scannedResult == null) {
+        onNavigateBack()
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            scanner.close()
+        }
+    }
 }

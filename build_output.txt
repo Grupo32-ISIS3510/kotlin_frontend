@@ -1,0 +1,527 @@
+Initialized native services in: C:\Users\arnul\.gradle\native
+Initialized jansi services in: C:\Users\arnul\.gradle\native
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.3.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Received JVM installation metadata from 'C:\Program Files\Java\jre-1.8': {JAVA_HOME=C:\Program Files\Java\jre-1.8, JAVA_VERSION=1.8.0_401, JAVA_VENDOR=Oracle Corporation, RUNTIME_NAME=Java(TM) SE Runtime Environment, RUNTIME_VERSION=1.8.0_401-b10, VM_NAME=Java HotSpot(TM) 64-Bit Server VM, VM_VERSION=25.401-b10, VM_VENDOR=Oracle Corporation, OS_ARCH=amd64}
+Starting process 'command 'C:\Users\arnul\.jdks\ms-17.0.17\bin\java.exe''. Working directory: C:\Users\arnul\.gradle\.tmp\tmp-jvm6161308507945795012probe Command: C:\Users\arnul\.jdks\ms-17.0.17\bin\java.exe -Xmx32m -Xms32m -cp . JavaProbe
+Successfully started process 'command 'C:\Users\arnul\.jdks\ms-17.0.17\bin\java.exe''
+Received JVM installation metadata from 'C:\Users\arnul\.jdks\ms-17.0.17': {JAVA_HOME=C:\Users\arnul\.jdks\ms-17.0.17, JAVA_VERSION=17.0.17, JAVA_VENDOR=Microsoft, RUNTIME_NAME=OpenJDK Runtime Environment, RUNTIME_VERSION=17.0.17+10-LTS, VM_NAME=OpenJDK 64-Bit Server VM, VM_VERSION=17.0.17+10-LTS, VM_VENDOR=Microsoft, OS_ARCH=amd64}
+Starting process 'Gradle build daemon'. Working directory: C:\Users\arnul\.gradle\daemon\9.3.1 Command: C:\Users\arnul\.gradle\jdks\eclipse_adoptium-21-amd64-windows.2\bin\java.exe --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang.invoke=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.prefs/java.util.prefs=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.prefs/java.util.prefs=ALL-UNNAMED --add-opens=java.base/java.nio.charset=ALL-UNNAMED --add-opens=java.base/java.net=ALL-UNNAMED --add-opens=java.base/java.util.concurrent=ALL-UNNAMED --add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED --add-opens=java.xml/javax.xml.namespace=ALL-UNNAMED --add-opens=java.base/java.time=ALL-UNNAMED -Xmx2048m -Dfile.encoding=UTF-8 -Duser.country=CO -Duser.language=es -Duser.variant -cp C:\Users\arnul\.gradle\wrapper\dists\gradle-9.3.1-bin\23ovyewtku6u96viwx3xl3oks\gradle-9.3.1\lib\gradle-daemon-main-9.3.1.jar -javaagent:C:\Users\arnul\.gradle\wrapper\dists\gradle-9.3.1-bin\23ovyewtku6u96viwx3xl3oks\gradle-9.3.1\lib\agents\gradle-instrumentation-agent-9.3.1.jar org.gradle.launcher.daemon.bootstrap.GradleDaemon 9.3.1
+Successfully started process 'Gradle build daemon'
+An attempt to start the daemon took 5.065 secs.
+The client will now receive all logging from the daemon (pid: 19636). The daemon log file: C:\Users\arnul\.gradle\daemon\9.3.1\daemon-19636.out.log
+Daemon will be stopped at the end of the build 
+Using 4 worker leases.
+Operational build model parameters: {requiresToolingModels=false, parallelProjectExecution=false, configureOnDemand=false, configurationCache=false, configurationCacheParallelStore=false, configurationCacheParallelLoad=true, isolatedProjects=false, parallelProjectConfiguration=false, intermediateModelCache=false, parallelToolingApiActions=false, invalidateCoupledProjects=false, modelAsProjectDependency=false, resilientModelBuilding=false}
+Received JVM installation metadata from 'C:\Users\arnul\.gradle\jdks\eclipse_adoptium-21-amd64-windows.2': {JAVA_HOME=C:\Users\arnul\.gradle\jdks\eclipse_adoptium-21-amd64-windows.2, JAVA_VERSION=21.0.7, JAVA_VENDOR=Eclipse Adoptium, RUNTIME_NAME=Java(TM) SE Runtime Environment, RUNTIME_VERSION=21.0.7+6-LTS, VM_NAME=OpenJDK 64-Bit Server VM, VM_VERSION=21.0.7+6-LTS, VM_VENDOR=Eclipse Adoptium, OS_ARCH=amd64}
+Watching the file system is configured to be enabled if available
+Now considering [C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend] as hierarchies to watch
+File system watching is active
+Starting Build
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\9.3.1\fileHashes\fileHashes.bin
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\9.3.1\fileHashes\resourceHashesCache.bin
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\journal-1\file-access.bin
+Resolved plugin [id: 'org.gradle.toolchains.foojay-resolver-convention', version: '1.0.0']
+Settings evaluated using settings file 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\settings.gradle.kts'.
+Projects loaded. Root project using build file 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\build.gradle.kts'.
+Included projects: [root project 'My Application', project ':app']
+
+> Configure project :
+Evaluating root project 'My Application' using build file 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\build.gradle.kts'.
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\journal-1\file-access.bin
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\9.3.1\fileHashes\kotlinDslCompileAvoidanceClasspathHashCache.bin
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\9.3.1\fileHashes\fileHashes.bin
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\9.3.1\fileHashes\resourceHashesCache.bin
+Resolved plugin [id: 'com.android.application', version: '9.1.0', apply: false]
+Resolved plugin [id: 'org.jetbrains.kotlin.android', version: '2.2.10', apply: false]
+Resolved plugin [id: 'org.jetbrains.kotlin.plugin.compose', version: '2.2.10', apply: false]
+Resolved plugin [id: 'com.google.gms.google-services', version: '4.4.2', apply: false]
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\journal-1\file-access.bin
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\9.3.1\fileHashes\kotlinDslCompileAvoidanceClasspathHashCache.bin
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\9.3.1\fileHashes\fileHashes.bin
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\9.3.1\fileHashes\resourceHashesCache.bin
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\journal-1\file-access.bin
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\9.3.1\fileHashes\kotlinDslCompileAvoidanceClasspathHashCache.bin
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\9.3.1\fileHashes\fileHashes.bin
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\9.3.1\fileHashes\resourceHashesCache.bin
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\journal-1\file-access.bin
+
+> Configure project :app
+Evaluating project ':app' using build file 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\build.gradle.kts'.
+Resolved plugin [id: 'com.android.application', version: '9.1.0']
+Resolved plugin [id: 'org.jetbrains.kotlin.android', version: '2.2.10']
+Resolved plugin [id: 'org.jetbrains.kotlin.plugin.compose', version: '2.2.10']
+Resolved plugin [id: 'com.google.gms.google-services', version: '4.4.2']
+Resolved plugin [id: 'org.jetbrains.kotlin.kapt']
+WARNING: The option setting 'android.usesSdkInManifest.disallowed=false' is deprecated.
+The current default is 'true'.
+It will be removed in version 10.0 of the Android Gradle plugin.
+WARNING: The option setting 'android.sdk.defaultTargetSdkToCompileSdkIfUnset=false' is deprecated.
+The current default is 'true'.
+It will be removed in version 10.0 of the Android Gradle plugin.
+WARNING: The option setting 'android.enableAppCompileTimeRClass=false' is deprecated.
+The current default is 'true'.
+It will be removed in version 10.0 of the Android Gradle plugin.
+WARNING: The option setting 'android.builtInKotlin=false' is deprecated.
+The current default is 'true'.
+It will be removed in version 10.0 of the Android Gradle plugin.
+WARNING: The option setting 'android.newDsl=false' is deprecated.
+The current default is 'true'.
+It will be removed in version 10.0 of the Android Gradle plugin.
+WARNING: The option setting 'android.r8.optimizedResourceShrinking=false' is deprecated.
+The current default is 'true'.
+It will be removed in version 10.0 of the Android Gradle plugin.
+WARNING: The option setting 'android.defaults.buildfeatures.resvalues=true' is deprecated.
+The current default is 'false'.
+It will be removed in version 10.0 of the Android Gradle plugin.
+Using default execution profile
+Build 4f160ad3-8fdd-4ef5-b073-793cd48f8ddb is started
+Using Kotlin Gradle Plugin gradle813 variant
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\9.3.1\fileHashes\kotlinDslCompileAvoidanceClasspathHashCache.bin
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\9.3.1\fileHashes\fileHashes.bin
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\9.3.1\fileHashes\resourceHashesCache.bin
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\journal-1\file-access.bin
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\9.3.1\fileHashes\kotlinDslCompileAvoidanceClasspathHashCache.bin
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\9.3.1\fileHashes\fileHashes.bin
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\9.3.1\fileHashes\resourceHashesCache.bin
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\journal-1\file-access.bin
+WARNING: The property android.dependency.excludeLibraryComponentsFromConstraints improves project import performance for very large projects. It should be enabled to improve performance.
+To suppress this warning, add android.generateSyncIssueWhenLibraryConstraintsAreEnabled=false to gradle.properties
+WARNING: The property android.dependency.excludeLibraryComponentsFromConstraints improves project import performance for very large projects. It should be enabled to improve performance.
+To suppress this warning, add android.generateSyncIssueWhenLibraryConstraintsAreEnabled=false to gradle.properties
+WARNING: The property android.dependency.excludeLibraryComponentsFromConstraints improves project import performance for very large projects. It should be enabled to improve performance.
+To suppress this warning, add android.generateSyncIssueWhenLibraryConstraintsAreEnabled=false to gradle.properties
+WARNING: The property android.dependency.excludeLibraryComponentsFromConstraints improves project import performance for very large projects. It should be enabled to improve performance.
+To suppress this warning, add android.generateSyncIssueWhenLibraryConstraintsAreEnabled=false to gradle.properties
+Detected Android Gradle Plugin compose compiler configuration
+Detected Android Gradle Plugin compose compiler configuration
+Detected Android Gradle Plugin compose compiler configuration
+Detected Android Gradle Plugin compose compiler configuration
+All projects evaluated.
+Task name matched 'assembleDebug'
+Selected primary task 'assembleDebug' from project :
+Adding -Xuse-inline-scopes-numbers Kotlin compiler flag for task :app:compileDebugKotlin
+Tasks to be executed: [task ':app:preBuild', task ':app:preDebugBuild', task ':app:mergeDebugNativeDebugMetadata', task ':app:checkKotlinGradlePluginConfigurationErrors', task ':app:dataBindingMergeDependencyArtifactsDebug', task ':app:generateDebugResValues', task ':app:generateDebugResources', task ':app:processDebugGoogleServices', task ':app:mergeDebugResources', task ':app:packageDebugResources', task ':app:processDebugNavigationResources', task ':app:parseDebugLocalResources', task ':app:dataBindingGenBaseClassesDebug', task ':app:checkDebugAarMetadata', task ':app:mapDebugSourceSetPaths', task ':app:compileDebugNavigationResources', task ':app:createDebugCompatibleScreenManifests', task ':app:extractDeepLinksDebug', task ':app:processDebugMainManifest', task ':app:processDebugManifest', task ':app:processDebugManifestForPackage', task ':app:processDebugResources', task ':app:kaptGenerateStubsDebugKotlin', task ':app:kaptDebugKotlin', task ':app:compileDebugKotlin', task ':app:javaPreCompileDebug', task ':app:compileDebugJavaWithJavac', task ':app:generateDebugAssets', task ':app:mergeDebugAssets', task ':app:compressDebugAssets', task ':app:l8DexDesugarLibDebug', task ':app:processDebugJavaRes', task ':app:mergeDebugJavaResource', task ':app:checkDebugDuplicateClasses', task ':app:desugarDebugFileDependencies', task ':app:mergeExtDexDebug', task ':app:mergeLibDexDebug', task ':app:dexBuilderDebug', task ':app:mergeProjectDexDebug', task ':app:mergeDebugJniLibFolders', task ':app:mergeDebugNativeLibs', task ':app:stripDebugDebugSymbols', task ':app:validateSigningDebug', task ':app:writeDebugAppMetadata', task ':app:writeDebugSigningConfigVersions', task ':app:packageDebug', task ':app:createDebugApkListingFileRedirect', task ':app:assembleDebug']
+Tasks that were excluded: []
+Resolve mutations for :app:preBuild (Thread[#64,included builds,5,main]) started.
+:app:preBuild (Thread[#65,Execution worker,5,main]) started.
+
+> Task :app:preBuild UP-TO-DATE
+Skipping task ':app:preBuild' as it has no actions.
+Resolve mutations for :app:preDebugBuild (Thread[#65,Execution worker,5,main]) started.
+:app:preDebugBuild (Thread[#65,Execution worker,5,main]) started.
+
+> Task :app:preDebugBuild UP-TO-DATE
+Skipping task ':app:preDebugBuild' as it has no actions.
+Resolve mutations for :app:mergeDebugNativeDebugMetadata (Thread[#64,included builds,5,main]) started.
+:app:mergeDebugNativeDebugMetadata (Thread[#64,included builds,5,main]) started.
+
+> Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
+Invalidating in-memory cache of C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\.gradle\buildOutputCleanup\outputFiles.bin
+Skipping task ':app:mergeDebugNativeDebugMetadata' as it has no source files and no previous output files.
+Resolve mutations for :app:checkKotlinGradlePluginConfigurationErrors (Thread[#64,included builds,5,main]) started.
+:app:checkKotlinGradlePluginConfigurationErrors (Thread[#64,included builds,5,main]) started.
+
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+Skipping task ':app:checkKotlinGradlePluginConfigurationErrors' as task onlyIf 'errorDiagnostics are present' is false.
+Resolve mutations for :app:dataBindingMergeDependencyArtifactsDebug (Thread[#65,Execution worker,5,main]) started.
+:app:dataBindingMergeDependencyArtifactsDebug (Thread[#65,Execution worker,5,main]) started.
+
+> Task :app:dataBindingMergeDependencyArtifactsDebug
+Registered task dependencies: app:debugCompileClasspath
+Skipping misunderstood TO dep string: androidx.compose.ui:ui-tooling
+Skipping misunderstood TO dep string: androidx.compose.ui:ui-test-manifest
+Skipping misunderstood TO dep string: androidx.compose.ui:ui
+Skipping misunderstood TO dep string: androidx.compose.ui:ui-graphics
+Skipping misunderstood TO dep string: androidx.compose.ui:ui-tooling-preview
+Skipping misunderstood TO dep string: androidx.compose.material3:material3
+Skipping misunderstood TO dep string: androidx.compose.material3:material3-adaptive-navigation-suite
+Skipping misunderstood TO dep string: androidx.compose.material:material-icons-core
+Skipping misunderstood TO dep string: androidx.compose.material:material-icons-extended
+Skipping misunderstood TO dep string: com.google.firebase:firebase-analytics
+Skipping misunderstood TO dep string: com.google.firebase:firebase-messaging
+Starting dependency analysis
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\journal-1\file-access.bin
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\9.3.1\fileHashes\kotlinDslCompileAvoidanceClasspathHashCache.bin
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\9.3.1\fileHashes\fileHashes.bin
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\9.3.1\fileHashes\resourceHashesCache.bin
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\journal-1\file-access.bin
+Caching disabled for task ':app:dataBindingMergeDependencyArtifactsDebug' because:
+  Build cache is disabled
+  Caching has been disabled for the task
+Skipping task ':app:dataBindingMergeDependencyArtifactsDebug' as it is up-to-date.
+
+> Task :app:dataBindingMergeDependencyArtifactsDebug UP-TO-DATE
+Resolve mutations for :app:generateDebugResValues (Thread[#65,Execution worker,5,main]) started.
+:app:generateDebugResValues (Thread[#65,Execution worker,5,main]) started.
+
+> Task :app:generateDebugResValues UP-TO-DATE
+Caching disabled for task ':app:generateDebugResValues' because:
+  Build cache is disabled
+Skipping task ':app:generateDebugResValues' as it is up-to-date.
+Resolve mutations for :app:generateDebugResources (Thread[#65,Execution worker,5,main]) started.
+:app:generateDebugResources (Thread[#65,Execution worker,5,main]) started.
+
+> Task :app:generateDebugResources UP-TO-DATE
+Invalidating in-memory cache of C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\.gradle\9.3.1\fileHashes\fileHashes.bin
+Invalidating in-memory cache of C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\.gradle\9.3.1\fileHashes\resourceHashesCache.bin
+Caching disabled for task ':app:generateDebugResources' because:
+  Build cache is disabled
+Skipping task ':app:generateDebugResources' as it is up-to-date.
+Resolve mutations for :app:processDebugGoogleServices (Thread[#66,Execution worker Thread 2,5,main]) started.
+:app:processDebugGoogleServices (Thread[#66,Execution worker Thread 2,5,main]) started.
+
+> Task :app:processDebugGoogleServices UP-TO-DATE
+Caching disabled for task ':app:processDebugGoogleServices' because:
+  Build cache is disabled
+Skipping task ':app:processDebugGoogleServices' as it is up-to-date.
+Resolve mutations for :app:mergeDebugResources (Thread[#66,Execution worker Thread 2,5,main]) started.
+:app:mergeDebugResources (Thread[#66,Execution worker Thread 2,5,main]) started.
+
+> Task :app:mergeDebugResources
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\journal-1\file-access.bin
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\9.3.1\fileHashes\kotlinDslCompileAvoidanceClasspathHashCache.bin
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\9.3.1\fileHashes\fileHashes.bin
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\9.3.1\fileHashes\resourceHashesCache.bin
+Caching disabled for task ':app:mergeDebugResources' because:
+  Build cache is disabled
+Skipping task ':app:mergeDebugResources' as it is up-to-date.
+
+> Task :app:mergeDebugResources UP-TO-DATE
+Resolve mutations for :app:packageDebugResources (Thread[#66,Execution worker Thread 2,5,main]) started.
+:app:packageDebugResources (Thread[#66,Execution worker Thread 2,5,main]) started.
+
+> Task :app:packageDebugResources UP-TO-DATE
+Invalidating in-memory cache of C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\.gradle\9.3.1\fileHashes\fileHashes.bin
+Invalidating in-memory cache of C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\.gradle\9.3.1\fileHashes\resourceHashesCache.bin
+Caching disabled for task ':app:packageDebugResources' because:
+  Build cache is disabled
+Skipping task ':app:packageDebugResources' as it is up-to-date.
+Resolve mutations for :app:processDebugNavigationResources (Thread[#66,Execution worker Thread 2,5,main]) started.
+:app:processDebugNavigationResources (Thread[#66,Execution worker Thread 2,5,main]) started.
+
+> Task :app:processDebugNavigationResources UP-TO-DATE
+Caching disabled for task ':app:processDebugNavigationResources' because:
+  Build cache is disabled
+Skipping task ':app:processDebugNavigationResources' as it is up-to-date.
+Resolve mutations for :app:parseDebugLocalResources (Thread[#66,Execution worker Thread 2,5,main]) started.
+:app:parseDebugLocalResources (Thread[#66,Execution worker Thread 2,5,main]) started.
+
+> Task :app:parseDebugLocalResources UP-TO-DATE
+Caching disabled for task ':app:parseDebugLocalResources' because:
+  Build cache is disabled
+Skipping task ':app:parseDebugLocalResources' as it is up-to-date.
+Resolve mutations for :app:dataBindingGenBaseClassesDebug (Thread[#66,Execution worker Thread 2,5,main]) started.
+:app:dataBindingGenBaseClassesDebug (Thread[#66,Execution worker Thread 2,5,main]) started.
+
+> Task :app:dataBindingGenBaseClassesDebug
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\journal-1\file-access.bin
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\9.3.1\fileHashes\kotlinDslCompileAvoidanceClasspathHashCache.bin
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\9.3.1\fileHashes\fileHashes.bin
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\9.3.1\fileHashes\resourceHashesCache.bin
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\journal-1\file-access.bin
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\9.3.1\fileHashes\kotlinDslCompileAvoidanceClasspathHashCache.bin
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\9.3.1\fileHashes\fileHashes.bin
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\9.3.1\fileHashes\resourceHashesCache.bin
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\journal-1\file-access.bin
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\9.3.1\fileHashes\kotlinDslCompileAvoidanceClasspathHashCache.bin
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\9.3.1\fileHashes\fileHashes.bin
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\9.3.1\fileHashes\resourceHashesCache.bin
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\journal-1\file-access.bin
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\9.3.1\fileHashes\kotlinDslCompileAvoidanceClasspathHashCache.bin
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\9.3.1\fileHashes\fileHashes.bin
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\9.3.1\fileHashes\resourceHashesCache.bin
+Caching disabled for task ':app:dataBindingGenBaseClassesDebug' because:
+  Build cache is disabled
+Skipping task ':app:dataBindingGenBaseClassesDebug' as it is up-to-date.
+
+> Task :app:dataBindingGenBaseClassesDebug UP-TO-DATE
+Resolve mutations for :app:checkDebugAarMetadata (Thread[#66,Execution worker Thread 2,5,main]) started.
+:app:checkDebugAarMetadata (Thread[#65,Execution worker,5,main]) started.
+
+> Task :app:checkDebugAarMetadata
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\journal-1\file-access.bin
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\9.3.1\fileHashes\kotlinDslCompileAvoidanceClasspathHashCache.bin
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\9.3.1\fileHashes\fileHashes.bin
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\9.3.1\fileHashes\resourceHashesCache.bin
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\journal-1\file-access.bin
+Caching disabled for task ':app:checkDebugAarMetadata' because:
+  Build cache is disabled
+  Caching has been disabled for the task
+Skipping task ':app:checkDebugAarMetadata' as it is up-to-date.
+
+> Task :app:checkDebugAarMetadata UP-TO-DATE
+Resolve mutations for :app:mapDebugSourceSetPaths (Thread[#66,Execution worker Thread 2,5,main]) started.
+:app:mapDebugSourceSetPaths (Thread[#66,Execution worker Thread 2,5,main]) started.
+
+> Task :app:mapDebugSourceSetPaths UP-TO-DATE
+Invalidating in-memory cache of C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\.gradle\9.3.1\fileHashes\fileHashes.bin
+Invalidating in-memory cache of C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\.gradle\9.3.1\fileHashes\resourceHashesCache.bin
+Caching disabled for task ':app:mapDebugSourceSetPaths' because:
+  Build cache is disabled
+  Caching has been disabled for the task
+Skipping task ':app:mapDebugSourceSetPaths' as it is up-to-date.
+Resolve mutations for :app:compileDebugNavigationResources (Thread[#66,Execution worker Thread 2,5,main]) started.
+:app:compileDebugNavigationResources (Thread[#66,Execution worker Thread 2,5,main]) started.
+
+> Task :app:compileDebugNavigationResources UP-TO-DATE
+Caching disabled for task ':app:compileDebugNavigationResources' because:
+  Build cache is disabled
+Skipping task ':app:compileDebugNavigationResources' as it is up-to-date.
+Resolve mutations for :app:createDebugCompatibleScreenManifests (Thread[#66,Execution worker Thread 2,5,main]) started.
+:app:createDebugCompatibleScreenManifests (Thread[#66,Execution worker Thread 2,5,main]) started.
+
+> Task :app:createDebugCompatibleScreenManifests UP-TO-DATE
+Caching disabled for task ':app:createDebugCompatibleScreenManifests' because:
+  Build cache is disabled
+  Caching has been disabled for the task
+Skipping task ':app:createDebugCompatibleScreenManifests' as it is up-to-date.
+Resolve mutations for :app:extractDeepLinksDebug (Thread[#66,Execution worker Thread 2,5,main]) started.
+:app:extractDeepLinksDebug (Thread[#66,Execution worker Thread 2,5,main]) started.
+
+> Task :app:extractDeepLinksDebug UP-TO-DATE
+Caching disabled for task ':app:extractDeepLinksDebug' because:
+  Build cache is disabled
+Skipping task ':app:extractDeepLinksDebug' as it is up-to-date.
+Resolve mutations for :app:processDebugMainManifest (Thread[#66,Execution worker Thread 2,5,main]) started.
+:app:processDebugMainManifest (Thread[#66,Execution worker Thread 2,5,main]) started.
+
+> Task :app:processDebugMainManifest UP-TO-DATE
+Caching disabled for task ':app:processDebugMainManifest' because:
+  Build cache is disabled
+Skipping task ':app:processDebugMainManifest' as it is up-to-date.
+Resolve mutations for :app:processDebugManifest (Thread[#65,Execution worker,5,main]) started.
+:app:processDebugManifest (Thread[#65,Execution worker,5,main]) started.
+
+> Task :app:processDebugManifest UP-TO-DATE
+Caching disabled for task ':app:processDebugManifest' because:
+  Build cache is disabled
+Skipping task ':app:processDebugManifest' as it is up-to-date.
+Resolve mutations for :app:processDebugManifestForPackage (Thread[#65,Execution worker,5,main]) started.
+:app:processDebugManifestForPackage (Thread[#65,Execution worker,5,main]) started.
+
+> Task :app:processDebugManifestForPackage UP-TO-DATE
+Custom actions are attached to task ':app:processDebugManifestForPackage'.
+Caching disabled for task ':app:processDebugManifestForPackage' because:
+  Build cache is disabled
+Skipping task ':app:processDebugManifestForPackage' as it is up-to-date.
+Resolve mutations for :app:processDebugResources (Thread[#65,Execution worker,5,main]) started.
+:app:processDebugResources (Thread[#65,Execution worker,5,main]) started.
+
+> Task :app:processDebugResources
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\9.3.1\fileHashes\kotlinDslCompileAvoidanceClasspathHashCache.bin
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\9.3.1\fileHashes\fileHashes.bin
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\9.3.1\fileHashes\resourceHashesCache.bin
+Invalidating in-memory cache of C:\Users\arnul\.gradle\caches\journal-1\file-access.bin
+Caching disabled for task ':app:processDebugResources' because:
+  Build cache is disabled
+Skipping task ':app:processDebugResources' as it is up-to-date.
+
+> Task :app:processDebugResources UP-TO-DATE
+Resolve mutations for :app:kaptGenerateStubsDebugKotlin (Thread[#65,Execution worker,5,main]) started.
+:app:kaptGenerateStubsDebugKotlin (Thread[#65,Execution worker,5,main]) started.
+
+> Task :app:kaptGenerateStubsDebugKotlin
+Adding -Xuse-inline-scopes-numbers Kotlin compiler flag for task :app:compileDebugAndroidTestKotlin
+GradleBuildProject.Builder should not be accessed through AnalyticsConfiguratorService after AnalyticsService is created. Analytics information of this build might be incomplete.
+Registered task dependencies: app:kotlinCompilerClasspath
+Starting dependency analysis
+Registered task dependencies: app:kotlinCompilerPluginClasspathDebug
+Starting dependency analysis
+Caching disabled for task ':app:kaptGenerateStubsDebugKotlin' because:
+  Build cache is disabled
+Task ':app:kaptGenerateStubsDebugKotlin' is not up-to-date because:
+  Output property 'classpathSnapshotProperties.classpathSnapshotDir' file C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\build\kotlin\kaptGenerateStubsDebugKotlin\classpath-snapshot\shrunk-classpath-snapshot.bin has been removed.
+  Output property 'destinationDirectory' file C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\build\tmp\kapt3\incrementalData\debug\META-INF has been removed.
+  Output property 'destinationDirectory' file C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\build\tmp\kapt3\incrementalData\debug\META-INF\app_debug.kotlin_module has been removed.
+  and more...
+The input changes require a full rebuild for incremental task ':app:kaptGenerateStubsDebugKotlin'.
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\debug\kotlin', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\debug\java', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\debug\kotlin', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\debug\java', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\debug\kotlin', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\debug\java', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\main\kotlin', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\main\kotlin', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\main\kotlin', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\main\kotlin', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\main\kotlin', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\main\kotlin', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\debug\kotlin', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\debug\java', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\debug\kotlin', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\debug\java', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\debug\kotlin', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\debug\java', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\debug\java', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\main\kotlin', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\debug\kotlin', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\debug\kotlin', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\debug\java', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\debug\kotlin', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\debug\java', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\debug\kotlin', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\debug\java', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\main\kotlin', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\debug\kotlin', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\debug\java', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\debug\kotlin', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\debug\java', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\debug\kotlin', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\debug\java', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\main\kotlin', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\main\kotlin', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\main\kotlin', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\main\kotlin', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\main\kotlin', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\main\kotlin', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\debug\kotlin', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\debug\java', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\debug\kotlin', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\debug\java', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\debug\kotlin', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\debug\java', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\debug\java', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\main\kotlin', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\debug\kotlin', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\debug\kotlin', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\debug\java', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\debug\kotlin', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\debug\java', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\debug\kotlin', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\debug\java', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\main\kotlin', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\main\kotlin', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\main\kotlin', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\main\kotlin', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\main\kotlin', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\main\kotlin', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\debug\kotlin', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\debug\java', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\debug\kotlin', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\debug\java', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\debug\kotlin', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\debug\java', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\debug\java', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\main\kotlin', not found
+file or directory 'C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\src\debug\kotlin', not found
+Using Kotlin/JVM incremental compilation
+[KOTLIN] Kotlin compilation 'jdkHome' argument: null
+
+Resolve mutations for :app:javaPreCompileDebug (Thread[#67,Execution worker Thread 3,5,main]) started.
+:app:javaPreCompileDebug (Thread[#67,Execution worker Thread 3,5,main]) started.
+
+> Task :app:javaPreCompileDebug UP-TO-DATE
+Caching disabled for task ':app:javaPreCompileDebug' because:
+  Build cache is disabled
+Skipping task ':app:javaPreCompileDebug' as it is up-to-date.
+Resolve mutations for :app:generateDebugAssets (Thread[#67,Execution worker Thread 3,5,main]) started.
+:app:generateDebugAssets (Thread[#67,Execution worker Thread 3,5,main]) started.
+
+> Task :app:generateDebugAssets UP-TO-DATE
+Skipping task ':app:generateDebugAssets' as it has no actions.
+Resolve mutations for :app:mergeDebugAssets (Thread[#67,Execution worker Thread 3,5,main]) started.
+:app:mergeDebugAssets (Thread[#67,Execution worker Thread 3,5,main]) started.
+
+> Task :app:mergeDebugAssets UP-TO-DATE
+Caching disabled for task ':app:mergeDebugAssets' because:
+  Build cache is disabled
+  Simple merging task
+Skipping task ':app:mergeDebugAssets' as it is up-to-date.
+Resolve mutations for :app:compressDebugAssets (Thread[#67,Execution worker Thread 3,5,main]) started.
+:app:compressDebugAssets (Thread[#67,Execution worker Thread 3,5,main]) started.
+
+> Task :app:compressDebugAssets UP-TO-DATE
+Caching disabled for task ':app:compressDebugAssets' because:
+  Build cache is disabled
+Skipping task ':app:compressDebugAssets' as it is up-to-date.
+Resolve mutations for :app:l8DexDesugarLibDebug (Thread[#67,Execution worker Thread 3,5,main]) started.
+:app:l8DexDesugarLibDebug (Thread[#67,Execution worker Thread 3,5,main]) started.
+
+> Task :app:l8DexDesugarLibDebug UP-TO-DATE
+Caching disabled for task ':app:l8DexDesugarLibDebug' because:
+  Build cache is disabled
+Skipping task ':app:l8DexDesugarLibDebug' as it is up-to-date.
+Resolve mutations for :app:checkDebugDuplicateClasses (Thread[#67,Execution worker Thread 3,5,main]) started.
+:app:checkDebugDuplicateClasses (Thread[#64,included builds,5,main]) started.
+
+> Task :app:checkDebugDuplicateClasses UP-TO-DATE
+Caching disabled for task ':app:checkDebugDuplicateClasses' because:
+  Build cache is disabled
+  Caching has been disabled for the task
+Skipping task ':app:checkDebugDuplicateClasses' as it is up-to-date.
+Resolve mutations for :app:desugarDebugFileDependencies (Thread[#64,included builds,5,main]) started.
+:app:desugarDebugFileDependencies (Thread[#64,included builds,5,main]) started.
+
+> Task :app:desugarDebugFileDependencies UP-TO-DATE
+Caching disabled for task ':app:desugarDebugFileDependencies' because:
+  Build cache is disabled
+Skipping task ':app:desugarDebugFileDependencies' as it is up-to-date.
+Resolve mutations for :app:mergeExtDexDebug (Thread[#64,included builds,5,main]) started.
+:app:mergeExtDexDebug (Thread[#64,included builds,5,main]) started.
+
+> Task :app:mergeExtDexDebug UP-TO-DATE
+Caching disabled for task ':app:mergeExtDexDebug' because:
+  Build cache is disabled
+Skipping task ':app:mergeExtDexDebug' as it is up-to-date.
+Resolve mutations for :app:mergeLibDexDebug (Thread[#64,included builds,5,main]) started.
+:app:mergeLibDexDebug (Thread[#64,included builds,5,main]) started.
+
+> Task :app:mergeLibDexDebug UP-TO-DATE
+Caching disabled for task ':app:mergeLibDexDebug' because:
+  Build cache is disabled
+Skipping task ':app:mergeLibDexDebug' as it is up-to-date.
+Resolve mutations for :app:mergeDebugJniLibFolders (Thread[#64,included builds,5,main]) started.
+:app:mergeDebugJniLibFolders (Thread[#64,included builds,5,main]) started.
+
+> Task :app:mergeDebugJniLibFolders UP-TO-DATE
+Caching disabled for task ':app:mergeDebugJniLibFolders' because:
+  Build cache is disabled
+  Simple merging task
+Skipping task ':app:mergeDebugJniLibFolders' as it is up-to-date.
+Resolve mutations for :app:mergeDebugNativeLibs (Thread[#64,included builds,5,main]) started.
+:app:mergeDebugNativeLibs (Thread[#64,included builds,5,main]) started.
+
+> Task :app:mergeDebugNativeLibs UP-TO-DATE
+Caching disabled for task ':app:mergeDebugNativeLibs' because:
+  Build cache is disabled
+  Caching has been disabled for the task
+Skipping task ':app:mergeDebugNativeLibs' as it is up-to-date.
+Resolve mutations for :app:stripDebugDebugSymbols (Thread[#64,included builds,5,main]) started.
+:app:stripDebugDebugSymbols (Thread[#64,included builds,5,main]) started.
+
+> Task :app:stripDebugDebugSymbols UP-TO-DATE
+Caching disabled for task ':app:stripDebugDebugSymbols' because:
+  Build cache is disabled
+  Caching has been disabled for the task
+Skipping task ':app:stripDebugDebugSymbols' as it is up-to-date.
+Resolve mutations for :app:validateSigningDebug (Thread[#64,included builds,5,main]) started.
+:app:validateSigningDebug (Thread[#64,included builds,5,main]) started.
+
+> Task :app:validateSigningDebug UP-TO-DATE
+Caching disabled for task ':app:validateSigningDebug' because:
+  Build cache is disabled
+  Caching has been disabled for the task
+Skipping task ':app:validateSigningDebug' as it is up-to-date.
+Resolve mutations for :app:writeDebugAppMetadata (Thread[#64,included builds,5,main]) started.
+:app:writeDebugAppMetadata (Thread[#64,included builds,5,main]) started.
+
+> Task :app:writeDebugAppMetadata UP-TO-DATE
+Caching disabled for task ':app:writeDebugAppMetadata' because:
+  Build cache is disabled
+  Caching has been disabled for the task
+Skipping task ':app:writeDebugAppMetadata' as it is up-to-date.
+Resolve mutations for :app:writeDebugSigningConfigVersions (Thread[#64,included builds,5,main]) started.
+:app:writeDebugSigningConfigVersions (Thread[#64,included builds,5,main]) started.
+
+> Task :app:writeDebugSigningConfigVersions UP-TO-DATE
+Caching disabled for task ':app:writeDebugSigningConfigVersions' because:
+  Build cache is disabled
+  Caching has been disabled for the task
+Skipping task ':app:writeDebugSigningConfigVersions' as it is up-to-date.
+
+> Task :app:kaptGenerateStubsDebugKotlin
+i: cannot connect to registry: Connection reset
+i: starting the daemon as: C:\Users\arnul\.gradle\jdks\eclipse_adoptium-21-amd64-windows.2\bin\java -cp C:\Users\arnul\.gradle\caches\modules-2\files-2.1\org.jetbrains.kotlin\kotlin-compiler-embeddable\2.2.10\6882d39ef03b18879c1a5d2a83c2212361bed5fe\kotlin-compiler-embeddable-2.2.10.jar;C:\Users\arnul\.gradle\caches\modules-2\files-2.1\org.jetbrains.kotlin\kotlin-stdlib\2.2.10\30de6faa127a4a012db8e71bf1b9c0a99b1402b2\kotlin-stdlib-2.2.10.jar;C:\Users\arnul\.gradle\caches\modules-2\files-2.1\org.jetbrains.kotlin\kotlin-script-runtime\2.2.10\712f9bc08f378c13a4a00f0bbb28c76e59183e83\kotlin-script-runtime-2.2.10.jar;C:\Users\arnul\.gradle\caches\modules-2\files-2.1\org.jetbrains.kotlin\kotlin-reflect\1.6.10\1cbe9c92c12a94eea200d23c2bbaedaf3daf5132\kotlin-reflect-1.6.10.jar;C:\Users\arnul\.gradle\caches\modules-2\files-2.1\org.jetbrains.kotlin\kotlin-daemon-embeddable\2.2.10\212fd3c2c6e4e5d0f4db3c4191233e2b622380cc\kotlin-daemon-embeddable-2.2.10.jar;C:\Users\arnul\.gradle\caches\modules-2\files-2.1\org.jetbrains.kotlinx\kotlinx-coroutines-core-jvm\1.8.0\ac1dc37a30a93150b704022f8d895ee1bd3a36b3\kotlinx-coroutines-core-jvm-1.8.0.jar;C:\Users\arnul\.gradle\caches\modules-2\files-2.1\org.jetbrains\annotations\13.0\919f0dfe192fb4e063e7dacadee7f8bb9a2672a9\annotations-13.0.jar -Djava.awt.headless=true -Djava.rmi.server.hostname=127.0.0.1 -Xmx2048m -XX:ReservedCodeCacheSize=320m -Dkotlin.environment.keepalive -ea -XX:+UseCodeCacheFlushing -XX:+UseParallelGC -Dkotlin.daemon.initiator.marker.file=C:\Users\arnul\AppData\Local\Temp\kotlin-compiler-in-ypplication-11827209179621814137.alive --add-exports java.base/sun.nio.ch=ALL-UNNAMED org.jetbrains.kotlin.daemon.KotlinCompileDaemon --daemon-runFilesPath C:\Users\arnul\AppData\Local\kotlin\daemon --daemon-autoshutdownIdleSeconds=7200 --daemon-compilerClasspath C:\Users\arnul\.gradle\caches\modules-2\files-2.1\org.jetbrains.kotlin\kotlin-compiler-embeddable\2.2.10\6882d39ef03b18879c1a5d2a83c2212361bed5fe\kotlin-compiler-embeddable-2.2.10.jar;C:\Users\arnul\.gradle\caches\modules-2\files-2.1\org.jetbrains.kotlin\kotlin-stdlib\2.2.10\30de6faa127a4a012db8e71bf1b9c0a99b1402b2\kotlin-stdlib-2.2.10.jar;C:\Users\arnul\.gradle\caches\modules-2\files-2.1\org.jetbrains.kotlin\kotlin-script-runtime\2.2.10\712f9bc08f378c13a4a00f0bbb28c76e59183e83\kotlin-script-runtime-2.2.10.jar;C:\Users\arnul\.gradle\caches\modules-2\files-2.1\org.jetbrains.kotlin\kotlin-reflect\1.6.10\1cbe9c92c12a94eea200d23c2bbaedaf3daf5132\kotlin-reflect-1.6.10.jar;C:\Users\arnul\.gradle\caches\modules-2\files-2.1\org.jetbrains.kotlin\kotlin-daemon-embeddable\2.2.10\212fd3c2c6e4e5d0f4db3c4191233e2b622380cc\kotlin-daemon-embeddable-2.2.10.jar;C:\Users\arnul\.gradle\caches\modules-2\files-2.1\org.jetbrains.kotlinx\kotlinx-coroutines-core-jvm\1.8.0\ac1dc37a30a93150b704022f8d895ee1bd3a36b3\kotlinx-coroutines-core-jvm-1.8.0.jar;C:\Users\arnul\.gradle\caches\modules-2\files-2.1\org.jetbrains\annotations\13.0\919f0dfe192fb4e063e7dacadee7f8bb9a2672a9\annotations-13.0.jar
+i: #1 retrying connecting to the daemon 
+Options for KOTLIN DAEMON: IncrementalCompilationOptions(super=CompilationOptions(compilerMode=INCREMENTAL_COMPILER, targetPlatform=JVM, reportCategories=[0, 3], reportSeverity=2, requestedCompilationResults=[0], kotlinScriptExtensions=[]), sourceChanges=org.jetbrains.kotlin.buildtools.api.SourcesChanges$Unknown@fcb75b6, classpathChanges=NotAvailableForNonIncrementalRun, workingDir=C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\build\kotlin\kaptGenerateStubsDebugKotlin\cacheable, multiModuleICSettings=MultiModuleICSettings(buildHistoryFile=C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\build\kotlin\kaptGenerateStubsDebugKotlin\local-state\build-history.bin, useModuleDetection=true), icFeatures=IncrementalCompilationFeatures(usePreciseJavaTracking=true, withAbiSnapshot=false, preciseCompilationResultsBackup=true, keepIncrementalCompilationCachesInMemory=true, enableUnsafeIncrementalCompilationForMultiplatform=false, enableMonotonousIncrementalCompileSetExpansion=true), outputFiles=[C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\build\tmp\kapt3\incrementalData\debug, C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\build\tmp\kapt3\stubs\debug, C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\build\kotlin\kaptGenerateStubsDebugKotlin\cacheable, C:\Users\arnul\proyectos\trabajo\Moviles\kotlin_frontend\app\build\kotlin\kaptGenerateStubsDebugKotlin\local-state])

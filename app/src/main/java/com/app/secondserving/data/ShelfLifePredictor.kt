@@ -125,8 +125,8 @@ object ShelfLifePredictor {
         category: String,
         storageType: String = "ambiente"
     ): LocalDate {
-        val shelfLifeDays = predictShelfLifeDays(category, storageType)
-        return purchaseDate.plusDays(shelfLifeDays.toLong())
+        val shelfLifeDaysValue = predictShelfLifeDays(category, storageType)
+        return purchaseDate.plusDays(shelfLifeDaysValue.toLong())
     }
 
     /**
@@ -180,7 +180,7 @@ object ShelfLifePredictor {
         
         if (totalDays <= 0) return 0
         
-        return ((totalDays - elapsedDays).toDouble() / totalDays * 100).coerceIn(0, 100).toInt()
+        return ((totalDays - elapsedDays).toDouble() / totalDays * 100.0).coerceIn(0.0, 100.0).toInt()
     }
 
     /**
@@ -212,14 +212,14 @@ object ShelfLifePredictor {
      */
     fun enrichWithShelfLifePrediction(item: FoodItemEntity): FoodItemEntity {
         // Si ya tiene fecha de expiración, no hacer nada
-        if (item.expiryDate.isNotBlank() && item.expiryDate != "") {
+        if (item.expiryDate.isNotBlank()) {
             return item
         }
         
         // Predecir fecha de expiración
         val storageType = getStorageRecommendation(item.category)
         val predictedExpiry = predictExpiryDate(
-            purchaseDateStr = item.purchaseDate.ifBlank { LocalDate.now().toString() },
+            purchaseDateStr = if (item.purchaseDate.isBlank()) LocalDate.now().toString() else item.purchaseDate,
             category = item.category,
             storageType = storageType
         )

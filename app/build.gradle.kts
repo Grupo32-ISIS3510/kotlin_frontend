@@ -3,7 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.google.services)
-    kotlin("kapt")
+    alias(libs.plugins.ksp)
 }
 
 android {
@@ -29,6 +29,14 @@ android {
             )
         }
     }
+
+    // Configuración para soporte de 16 KB en AGP 9.1+
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
+
     compileOptions {
         isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_11
@@ -41,6 +49,17 @@ android {
         compose = true
         viewBinding = true
     }
+}
+
+// Add testClasses task for compatibility with external tools/plugins (e.g. CI or older IDEs)
+// This maps the expected 'testClasses' task to Android's unit test compilation tasks
+tasks.register("testClasses") {
+    description = "Assembles test classes."
+    group = "Verification"
+    // Depend on all unit test compilation tasks found in the project
+    dependsOn(tasks.matching { 
+        it.name.startsWith("compile") && it.name.contains("UnitTest") && (it.name.endsWith("Kotlin") || it.name.endsWith("Java"))
+    })
 }
 
 dependencies {
@@ -69,17 +88,7 @@ dependencies {
     // Room Database
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
-    annotationProcessor(libs.androidx.room.compiler)
-    // Para Kotlin usa kapt
-    kapt(libs.androidx.room.compiler)
-
-    // CameraX para escaneo OCR
-    implementation(libs.androidx.camera.camera2)
-    implementation(libs.androidx.camera.lifecycle)
-    implementation(libs.androidx.camera.view)
-
-    // ML Kit para OCR (reconocimiento de texto)
-    implementation(libs.mlkit.text.recognition)
+    ksp(libs.androidx.room.compiler)
 
     // Firebase
     implementation(platform(libs.firebase.bom))
@@ -91,6 +100,14 @@ dependencies {
     implementation(libs.retrofit.gson)
     implementation(libs.okhttp)
     implementation(libs.okhttp.logging)
+
+    // CameraX
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
+
+    // ML Kit Text Recognition
+    implementation(libs.mlkit.text.recognition)
 
 
     coreLibraryDesugaring(libs.desugar.jdk.libs)
