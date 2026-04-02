@@ -294,77 +294,6 @@ fun AddItemScreen(
                 singleLine = true
             )
 
-            // Botón de escáner OCR - En la mitad del formulario
-            Card(
-                onClick = {
-                    if (hasCameraPermission) {
-                        val photoFile = File(context.cacheDir, "receipt_capture.jpg")
-                        val photoUri = FileProvider.getUriForFile(
-                            context,
-                            "${context.packageName}.fileprovider",
-                            photoFile
-                        )
-                        capturedImageUri = photoUri
-                        cameraLauncher.launch(photoUri)
-                    } else {
-                        permissionLauncher.launch(Manifest.permission.CAMERA)
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = Color(0xFFE8F5E9)
-                ),
-                border = androidx.compose.foundation.BorderStroke(1.dp, GreenDark.copy(alpha = 0.3f))
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.QrCodeScanner,
-                        contentDescription = null,
-                        tint = GreenDark,
-                        modifier = Modifier.size(32.dp)
-                    )
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(2.dp)
-                    ) {
-                        Text(
-                            text = "📷 Escanear factura",
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 15.sp,
-                            color = GreenDark
-                        )
-                        Text(
-                            text = "Agrega productos automáticamente desde una imagen",
-                            fontSize = 12.sp,
-                            color = Color(0xFF555555)
-                        )
-                    }
-                    if (isScanning) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(24.dp),
-                            color = GreenDark,
-                            strokeWidth = 2.dp
-                        )
-                    } else {
-                        Icon(
-                            imageVector = Icons.Default.ArrowBack,
-                            contentDescription = null,
-                            tint = GreenDark,
-                            modifier = Modifier
-                                .size(24.dp)
-                                .rotate(180f)
-                        )
-                    }
-                }
-            }
-
             // Fecha de compra con botón de calendario
             OutlinedTextField(
                 value = purchaseDate,
@@ -533,6 +462,68 @@ fun AddItemScreen(
                         }
                     }
                 )
+            }
+
+            // Botón de escáner OCR - Central en el formulario
+            Card(
+                onClick = {
+                    if (hasCameraPermission) {
+                        val photoFile = File(context.cacheDir, "receipt_capture.jpg")
+                        val photoUri = FileProvider.getUriForFile(
+                            context,
+                            "${context.packageName}.fileprovider",
+                            photoFile
+                        )
+                        capturedImageUri = photoUri
+                        cameraLauncher.launch(photoUri)
+                    } else {
+                        permissionLauncher.launch(Manifest.permission.CAMERA)
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = GreenDark
+                ),
+                elevation = CardDefaults.cardElevation(4.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.QrCodeScanner,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(40.dp)
+                    )
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = "📷 Escanear con cámara",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp,
+                            color = Color.White
+                        )
+                        Text(
+                            text = "Detecta productos automáticamente",
+                            fontSize = 13.sp,
+                            color = Color(0xFFE8F5E9)
+                        )
+                    }
+                    if (isScanning) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(28.dp),
+                            color = Color.White,
+                            strokeWidth = 3.dp
+                        )
+                    }
+                }
             }
 
             // Error general
