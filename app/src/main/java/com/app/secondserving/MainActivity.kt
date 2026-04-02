@@ -64,7 +64,6 @@ enum class AppDestinations(val label: String, val icon: ImageVector) {
 fun MyApplicationApp() {
     var currentDestination by rememberSaveable { mutableStateOf(AppDestinations.DESPENSA) }
     var showAddItem by remember { mutableStateOf(false) }
-    var showScanReceipt by remember { mutableStateOf(false) }
     var selectedItem by remember { mutableStateOf<InventoryItemUi?>(null) }
     var selectedItemTip by remember { mutableStateOf("") }
     // Pedir permiso de notificaciones (Android 13+)
@@ -92,28 +91,10 @@ fun MyApplicationApp() {
         )
     )
 
-    // Pantalla de escanear factura
-    if (showScanReceipt) {
-        ScanReceiptScreen(
-            onItemsScanned = { items, purchaseDate ->
-                // Agregar los items escaneados al inventario en bulk
-                inventoryViewModel.createInventoryItemsBulk(items, purchaseDate)
-                showScanReceipt = false
-                currentDestination = AppDestinations.DESPENSA // Volver a despensa
-            },
-            onNavigateBack = { showScanReceipt = false }
-        )
-        return
-    }
-
     if (showAddItem) {
         AddItemScreen(
             viewModel = inventoryViewModel,
-            onNavigateBack = { showAddItem = false },
-            onOpenScanner = {
-                showAddItem = false
-                showScanReceipt = true
-            }
+            onNavigateBack = { showAddItem = false }
         )
         return
     }
@@ -159,42 +140,20 @@ fun MyApplicationApp() {
             }
         },
         floatingActionButton = {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
+            FloatingActionButton(
+                onClick = {
+                    inventoryViewModel.resetAddItemState()
+                    showAddItem = true
+                },
+                containerColor = Color(0xFF386641),
+                contentColor = Color.White
             ) {
-                // Botón de escanear factura
-                FloatingActionButton(
-                    onClick = {
-                        inventoryViewModel.resetAddItemState()
-                        showScanReceipt = true
-                    },
-                    containerColor = Color(0xFFFF6F00),
-                    contentColor = Color.White,
-                    modifier = Modifier.size(56.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.QrCodeScanner,
-                        contentDescription = "Escanear factura"
-                    )
-                }
-                // Botón de agregar manual
-                FloatingActionButton(
-                    onClick = {
-                        inventoryViewModel.resetAddItemState()
-                        showAddItem = true
-                    },
-                    containerColor = Color(0xFF386641),
-                    contentColor = Color.White
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "Agregar producto"
-                    )
-                }
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "Agregar producto"
+                )
             }
-        },
-        floatingActionButtonPosition = FabPosition.Center
+        }
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding)) {
             when (currentDestination) {

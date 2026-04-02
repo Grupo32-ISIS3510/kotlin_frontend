@@ -1,6 +1,13 @@
 package com.app.secondserving.ui.inventory
 
+import android.Manifest
+import android.net.Uri
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -15,12 +22,17 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.core.content.FileProvider
+import com.app.secondserving.data.ReceiptScanner
 import com.app.secondserving.data.ShelfLifePredictor
+import kotlinx.coroutines.launch
+import java.io.File
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -33,9 +45,10 @@ private val DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd")
 @Composable
 fun AddItemScreen(
     viewModel: InventoryViewModel,
-    onNavigateBack: () -> Unit,
-    onOpenScanner: (() -> Unit)? = null
+    onNavigateBack: () -> Unit
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val addItemState by viewModel.addItemState.collectAsState()
 
     var name by remember { mutableStateOf("") }
@@ -59,9 +72,114 @@ fun AddItemScreen(
     var showPurchaseDatePicker by remember { mutableStateOf(false) }
     var showExpiryDatePicker by remember { mutableStateOf(false) }
 
+    // Estado para escáner OCR
+    var isScanning by remember { mutableStateOf(false) }
+    var capturedImageUri by remember { mutableStateOf<Uri?>(null) }
+    val scanner = remember { ReceiptScanner(context) }
+
+    var hasCameraPermission by remember {
+        mutableStateOf(
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.CAMERA
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        )
+    }
+
+    // Launcher para cámara
+    val cameraLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success && capturedImageUri != null) {
+            isScanning = true
+            scope.launch {
+                try {
+                    val result = scanner.scanReceipt(capturedImageUri!!)
+                    if (result.error != null) {
+                        Toast.makeText(context, result.error, Toast.LENGTH_LONG).show()
+                    } else if (result.items.isNotEmpty()) {
+                        // Llenar campos con el primer producto detectado
+                        val firstItem = result.items.first()
+                        name = firstItem.name
+                        category = firstItem.category.ifBlank { "Otros" }
+                        quantity = "1"
+                        purchaseDate = result.purchaseDate ?: LocalDate.now().toString()
+                        predictedExpiryDate = ShelfLifePredictor.predictExpiryDate(
+                            purchaseDateStr = purchaseDate,
+                            category = category
+                        )
+                        storageTip = ShelfLifePredictor.getStorageRecommendation(category)
+                        showPredictionTip = true
+                        expiryDate = predictedExpiryDate
+                    } else {
+                        Toast.makeText(context, "No se detectaron productos en la imagen", Toast.LENGTH_LONG).show()
+                    }
+                } catch (e: Exception) {
+                    Toast.makeText(context, "Error al procesar: ${e.message}", Toast.LENGTH_LONG).show()
+                } finally {
+                    isScanning = false
+                }
+            }
+        }
+    }
+
+    // Launcher para galería
+    val galleryLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            isScanning = true
+            scope.launch {
+                try {
+                    val result = scanner.scanReceipt(it)
+                    if (result.error != null) {
+                        Toast.makeText(context, result.error, Toast.LENGTH_LONG).show()
+                    } else if (result.items.isNotEmpty()) {
+                        val firstItem = result.items.first()
+                        name = firstItem.name
+                        category = firstItem.category.ifBlank { "Otros" }
+                        quantity = "1"
+                        purchaseDate = result.purchaseDate ?: LocalDate.now().toString()
+                        predictedExpiryDate = ShelfLifePredictor.predictExpiryDate(
+                            purchaseDateStr = purchaseDate,
+                            category = category
+                        )
+                        storageTip = ShelfLifePredictor.getStorageRecommendation(category)
+                        showPredictionTip = true
+                        expiryDate = predictedExpiryDate
+                    } else {
+                        Toast.makeText(context, "No se detectaron productos en la imagen", Toast.LENGTH_LONG).show()
+                    }
+                } catch (e: Exception) {
+                    Toast.makeText(context, "Error al procesar: ${e.message}", Toast.LENGTH_LONG).show()
+                } finally {
+                    isScanning = false
+                }
+            }
+        }
+    }
+
+    // Launcher para permiso de cámara
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        hasCameraPermission = isGranted
+        if (isGranted) {
+            // Abrir cámara directamente
+            val photoFile = File(context.cacheDir, "receipt_capture.jpg")
+            val photoUri = FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                photoFile
+            )
+            capturedImageUri = photoUri
+            cameraLauncher.launch(photoUri)
+        }
+    }
+
     // Actualizar predicción cuando cambia categoría o fecha de compra
     LaunchedEffect(category, purchaseDate) {
-        if (purchaseDate.isNotBlank() && expiryDate.isBlank()) {
+        if (purchaseDate.isNotBlank() && expiryDate.isBlank() && !isScanning) {
             predictedExpiryDate = ShelfLifePredictor.predictExpiryDate(
                 purchaseDateStr = purchaseDate,
                 category = category
@@ -91,27 +209,6 @@ fun AddItemScreen(
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Volver")
-                    }
-                },
-                actions = {
-                    // Botón para escanear factura
-                    if (onOpenScanner != null) {
-                        IconButton(onClick = onOpenScanner) {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Icon(
-                                    Icons.Default.QrCodeScanner,
-                                    contentDescription = "Escanear factura",
-                                    tint = GreenDark
-                                )
-                                Text(
-                                    text = "Escanear",
-                                    fontSize = 10.sp,
-                                    color = GreenDark
-                                )
-                            }
-                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -196,6 +293,77 @@ fun AddItemScreen(
                 ),
                 singleLine = true
             )
+
+            // Botón de escáner OCR - En la mitad del formulario
+            Card(
+                onClick = {
+                    if (hasCameraPermission) {
+                        val photoFile = File(context.cacheDir, "receipt_capture.jpg")
+                        val photoUri = FileProvider.getUriForFile(
+                            context,
+                            "${context.packageName}.fileprovider",
+                            photoFile
+                        )
+                        capturedImageUri = photoUri
+                        cameraLauncher.launch(photoUri)
+                    } else {
+                        permissionLauncher.launch(Manifest.permission.CAMERA)
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color(0xFFE8F5E9)
+                ),
+                border = androidx.compose.foundation.BorderStroke(1.dp, GreenDark.copy(alpha = 0.3f))
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.QrCodeScanner,
+                        contentDescription = null,
+                        tint = GreenDark,
+                        modifier = Modifier.size(32.dp)
+                    )
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        Text(
+                            text = "📷 Escanear factura",
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 15.sp,
+                            color = GreenDark
+                        )
+                        Text(
+                            text = "Agrega productos automáticamente desde una imagen",
+                            fontSize = 12.sp,
+                            color = Color(0xFF555555)
+                        )
+                    }
+                    if (isScanning) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            color = GreenDark,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.ArrowBack,
+                            contentDescription = null,
+                            tint = GreenDark,
+                            modifier = Modifier
+                                .size(24.dp)
+                                .rotate(180f)
+                        )
+                    }
+                }
+            }
 
             // Fecha de compra con botón de calendario
             OutlinedTextField(
