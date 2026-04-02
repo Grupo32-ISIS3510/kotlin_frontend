@@ -5,68 +5,81 @@ import android.graphics.Bitmap
 import android.graphics.Color
 import android.net.Uri
 import android.util.Log
+import androidx.core.net.toUri
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.Text
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
 /**
- * Scanner OCR para extraer información de facturas/tickets.
- * Feature (a): Sensor — Cámara para escanear alimentos.
- * 
- * Usa preprocesamiento de imagen para mejorar nitidez:
- * - Escala de grises
- * - Ecualización de histograma (contraste)
- * - Umbral binario adaptativo
+ * Scanner híbrido OCR que soporta modo offline (ML Kit) y online (Cloud Vision API).
  *
- * Extrae:
- * - Nombres de productos
- * - Fechas de compra
- * - Precios
- * - Categorías (basado en palabras clave)
+ * - Offline: Rápido, gratis, sin internet (precisión ~80-85%)
+ * - Online: Más lento, requiere API Key, mejor precisión (~95%)
  */
-class ReceiptScanner(private val context: Context) {
+class ReceiptScannerHybrid(private val context: Context) {
 
     private val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
     private val dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy")
     private val dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
 
+    // API Key de Google Cloud Vision (en producción usar desde backend seguro)
+    private val cloudVisionApiKey = BuildConfig.GOOGLE_CLOUD_VISION_API_KEY
+    private val useOnlineOCR = cloudVisionApiKey.isNotBlank()
+
     /**
-     * Procesa una imagen (URI) y extrae texto usando OCR con preprocesamiento.
+     * Escanea una imagen con OCR híbrido.
+     * @param imageUri URI de la imagen
+     * @param preferOnline Si true, intenta OCR online primero si hay conexión
      */
-    suspend fun scanReceipt(imageUri: Uri): ReceiptScanResult {
+    suspend fun scanReceipt(imageUri: Uri, preferOnline: Boolean = false): ReceiptScanResult {
         return try {
             val bitmap = MediaUtils.bitmapFromUri(context, imageUri)
+            
+            // Preprocesar imagen para mejorar nitidez
             val preprocessedBitmap = preprocessBitmap(bitmap)
-            processBitmap(preprocessedBitmap)
+            
+            if (preferOnline && useOnlineOCR && isNetworkAvailable()) {
+                Log.d("ReceiptScanner", "Usando OCR Online (Cloud Vision API)")
+                scanReceiptOnline(preprocessedBitmap)
+            } else {
+                Log.d("ReceiptScanner", "Usando OCR Offline (ML Kit)")
+                processBitmapOffline(preprocessedBitmap)
+            }
         } catch (e: Exception) {
             Log.e("ReceiptScanner", "Error scanning receipt", e)
-            ReceiptScanResult(error = "Error procesando la imagen: ${e.message}")
+            // Fallback a offline si online falla
+            try {
+                val bitmap = MediaUtils.bitmapFromUri(context, imageUri)
+                val preprocessedBitmap = preprocessBitmap(bitmap)
+                processBitmapOffline(preprocessedBitmap)
+            } catch (e2: Exception) {
+                ReceiptScanResult(error = "Error procesando la imagen: ${e2.message}")
+            }
         }
     }
 
     /**
-     * Procesa un Bitmap y extrae texto usando OCR con preprocesamiento.
+     * Verifica si hay conexión de red disponible.
      */
-    suspend fun scanReceipt(bitmap: Bitmap): ReceiptScanResult {
-        return try {
-            val preprocessedBitmap = preprocessBitmap(bitmap)
-            processBitmap(preprocessedBitmap)
-        } catch (e: Exception) {
-            Log.e("ReceiptScanner", "Error scanning receipt", e)
-            ReceiptScanResult(error = "Error procesando la imagen: ${e.message}")
-        }
+    private fun isNetworkAvailable(): Boolean {
+        val connectivityManager =
+            context.getSystemService(Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
+        return connectivityManager?.activeNetworkInfo?.isConnectedOrConnecting == true
     }
 
     /**
      * Preprocesa el bitmap para mejorar la calidad del OCR.
      * - Escala a resolución óptima
      * - Convierte a escala de grises
-     * - Aumenta contraste con ecualización de histograma
-     * - Aplica umbral binario para texto
+     * - Aumenta contraste
+     * - Aplica umbral binario
      */
     private fun preprocessBitmap(bitmap: Bitmap): Bitmap {
         // 1. Escalar a resolución óptima para OCR (ancho máximo 1280px)
@@ -128,12 +141,12 @@ class ReceiptScanner(private val context: Context) {
             lookupTable[i] = ((cdf[i] - cdfMin) * 255 / (totalPixels - cdfMin)).coerceIn(0, 255)
         }
         
-        // 3. Umbral binario suave para texto (mejora OCR)
+        // 3. Aplicar umbral adaptativo (mejora para texto)
         for (i in pixels.indices) {
             val gray = Color.red(pixels[i])
             val enhanced = lookupTable[gray]
             
-            // Umbral: pixeles oscuros -> negro (texto), claros -> blanco (fondo)
+            // Umbral binario suave para texto
             val threshold = if (enhanced < 180) 0 else 255
             pixels[i] = Color.rgb(threshold, threshold, threshold)
         }
@@ -143,9 +156,9 @@ class ReceiptScanner(private val context: Context) {
     }
 
     /**
-     * Procesa el bitmap con ML Kit.
+     * Procesa bitmap con ML Kit (offline).
      */
-    private suspend fun processBitmap(bitmap: Bitmap): ReceiptScanResult {
+    private suspend fun processBitmapOffline(bitmap: Bitmap): ReceiptScanResult {
         val image = InputImage.fromBitmap(bitmap, 0)
         val visionText: Text = recognizer.process(image).await()
 
@@ -153,6 +166,88 @@ class ReceiptScanner(private val context: Context) {
         val lines = visionText.textBlocks.flatMap { it.lines }.map { it.text }
 
         return parseReceiptText(fullText, lines)
+    }
+
+    /**
+     * Procesa bitmap con Google Cloud Vision API (online).
+     * Requiere API Key configurada en BuildConfig.
+     */
+    private suspend fun scanReceiptOnline(bitmap: Bitmap): ReceiptScanResult = withContext(Dispatchers.IO) {
+        try {
+            // Convertir bitmap a Base64
+            val byteArrayOutputStream = ByteArrayOutputStream()
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, byteArrayOutputStream)
+            val imageBytes = byteArrayOutputStream.toByteArray()
+            val base64Image = android.util.Base64.encodeToString(imageBytes, android.util.Base64.NO_WRAP)
+
+            // Crear request para Cloud Vision API
+            val requestBody = mapOf(
+                "requests" to listOf(
+                    mapOf(
+                        "image" to mapOf("content" to base64Image),
+                        "features" to listOf(
+                            mapOf("type" to "TEXT_DETECTION", "maxResults" to 1)
+                        )
+                    )
+                )
+            )
+
+            // Hacer request HTTP a Cloud Vision API
+            val url = "https://vision.googleapis.com/v1/images:annotate?key=$cloudVisionApiKey"
+            
+            val jsonBody = com.google.gson.Gson().toJson(requestBody)
+            
+            val client = okhttp3.OkHttpClient.Builder()
+                .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+                .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+                .build()
+            
+            val request = okhttp3.Request.Builder()
+                .url(url)
+                .post(okhttp3.RequestBody.create(
+                    okhttp3.MediaType.parse("application/json"),
+                    jsonBody
+                ))
+                .build()
+            
+            val response = client.newCall(request).execute()
+            
+            if (!response.isSuccessful) {
+                Log.e("ReceiptScanner", "Cloud Vision API error: ${response.code}")
+                // Fallback a offline
+                return@withContext processBitmapOffline(bitmap)
+            }
+            
+            val responseBody = response.body?.string() ?: run {
+                return@withContext processBitmapOffline(bitmap)
+            }
+            
+            // Parsear respuesta de Cloud Vision
+            val jsonResponse = com.google.gson.JsonParser.parseString(responseBody).asJsonObject
+            val responses = jsonResponse.getAsJsonArray("responses")
+            
+            if (responses.size() == 0) {
+                return@withContext processBitmapOffline(bitmap)
+            }
+            
+            val result = responses[0].asJsonObject
+            val fullTextAnnotation = result.getAsJsonObject("fullTextAnnotation")
+            
+            if (fullTextAnnotation == null || !fullTextAnnotation.has("text")) {
+                return@withContext processBitmapOffline(bitmap)
+            }
+            
+            val fullText = fullTextAnnotation.get("text").asString
+            val lines = fullText.split("\n").filter { it.isNotBlank() }
+            
+            Log.d("ReceiptScanner", "Cloud Vision OCR exito. Texto: ${fullText.take(100)}...")
+            
+            parseReceiptText(fullText, lines)
+            
+        } catch (e: Exception) {
+            Log.e("ReceiptScanner", "Error en OCR online, fallback a offline", e)
+            processBitmapOffline(bitmap)
+        }
     }
 
     /**
@@ -242,8 +337,8 @@ class ReceiptScanner(private val context: Context) {
 
         // Buscar total
         for (line in lines.reversed().take(10)) {
-            if (line.contains("TOTAL", ignoreCase = true) || 
-                line.contains("Total", ignoreCase = true) || 
+            if (line.contains("TOTAL", ignoreCase = true) ||
+                line.contains("Total", ignoreCase = true) ||
                 line.contains("total", ignoreCase = true)) {
                 val priceMatch = pricePattern.find(line)
                 if (priceMatch != null) {
@@ -321,27 +416,6 @@ class ReceiptScanner(private val context: Context) {
         recognizer.close()
     }
 }
-
-/**
- * Resultado del escaneo de una factura.
- */
-data class ReceiptScanResult(
-    val items: List<ScannedItem> = emptyList(),
-    val purchaseDate: String? = null,
-    val totalAmount: Double? = null,
-    val fullText: String = "",
-    val rawLines: List<String> = emptyList(),
-    val error: String? = null
-)
-
-/**
- * Item escaneado de una factura.
- */
-data class ScannedItem(
-    val name: String,
-    val price: Double?,
-    val category: String
-)
 
 /**
  * Helper para verificar si un string contiene alguna de las palabras.

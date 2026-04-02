@@ -27,6 +27,10 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            buildConfigField("String", "GOOGLE_CLOUD_VISION_API_KEY", "\"\"")
+        }
+        debug {
+            buildConfigField("String", "GOOGLE_CLOUD_VISION_API_KEY", "\"\"")
         }
     }
 
@@ -108,6 +112,10 @@ dependencies {
 
     // ML Kit Text Recognition
     implementation(libs.mlkit.text.recognition)
+
+    // Google Cloud Vision API (OCR Online)
+    implementation(libs.google.cloud.vision)
+    implementation(libs.google.auth.library)
 
 
     coreLibraryDesugaring(libs.desugar.jdk.libs)

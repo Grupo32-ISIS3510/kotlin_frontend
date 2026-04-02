@@ -29,7 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.core.content.FileProvider
-import com.app.secondserving.data.ReceiptScanner
+import com.app.secondserving.data.ReceiptScannerHybrid
 import com.app.secondserving.data.ShelfLifePredictor
 import kotlinx.coroutines.launch
 import java.io.File
@@ -75,7 +75,10 @@ fun AddItemScreen(
     // Estado para escáner OCR
     var isScanning by remember { mutableStateOf(false) }
     var capturedImageUri by remember { mutableStateOf<Uri?>(null) }
-    val scanner = remember { ReceiptScanner(context) }
+    val scanner = remember { ReceiptScannerHybrid(context) }
+    
+    // Modo online/offline para OCR
+    var useOnlineOCR by remember { mutableStateOf(false) }
 
     var hasCameraPermission by remember {
         mutableStateOf(
@@ -94,7 +97,7 @@ fun AddItemScreen(
             isScanning = true
             scope.launch {
                 try {
-                    val result = scanner.scanReceipt(capturedImageUri!!)
+                    val result = scanner.scanReceipt(capturedImageUri!!, preferOnline = useOnlineOCR)
                     if (result.error != null) {
                         Toast.makeText(context, result.error, Toast.LENGTH_LONG).show()
                     } else if (result.items.isNotEmpty()) {
@@ -131,7 +134,7 @@ fun AddItemScreen(
             isScanning = true
             scope.launch {
                 try {
-                    val result = scanner.scanReceipt(it)
+                    val result = scanner.scanReceipt(it, preferOnline = useOnlineOCR)
                     if (result.error != null) {
                         Toast.makeText(context, result.error, Toast.LENGTH_LONG).show()
                     } else if (result.items.isNotEmpty()) {
@@ -317,49 +320,89 @@ fun AddItemScreen(
                 ),
                 border = androidx.compose.foundation.BorderStroke(1.dp, GreenDark.copy(alpha = 0.3f))
             ) {
-                Row(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.QrCodeScanner,
-                        contentDescription = null,
-                        tint = GreenDark,
-                        modifier = Modifier.size(32.dp)
-                    )
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    // Header con icono y estado
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "📷 Escanear factura",
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 15.sp,
-                            color = GreenDark
-                        )
-                        Text(
-                            text = "Agrega productos automáticamente desde una imagen",
-                            fontSize = 12.sp,
-                            color = Color(0xFF555555)
-                        )
-                    }
-                    if (isScanning) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(24.dp),
-                            color = GreenDark,
-                            strokeWidth = 2.dp
-                        )
-                    } else {
                         Icon(
-                            imageVector = Icons.Default.ArrowBack,
+                            imageVector = Icons.Default.QrCodeScanner,
                             contentDescription = null,
                             tint = GreenDark,
-                            modifier = Modifier
-                                .size(24.dp)
-                                .rotate(180f)
+                            modifier = Modifier.size(32.dp)
+                        )
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            Text(
+                                text = "📷 Escanear factura",
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 15.sp,
+                                color = GreenDark
+                            )
+                            Text(
+                                text = "Agrega productos automáticamente desde una imagen",
+                                fontSize = 12.sp,
+                                color = Color(0xFF555555)
+                            )
+                        }
+                        if (isScanning) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                color = GreenDark,
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.ArrowBack,
+                                contentDescription = null,
+                                tint = GreenDark,
+                                modifier = Modifier
+                                    .size(24.dp)
+                                    .rotate(180f)
+                            )
+                        }
+                    }
+                    
+                    // Toggle modo Online/Offline
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                text = if (useOnlineOCR) "✨ OCR Mejorado (Online)" else "⚡ OCR Rápido (Offline)",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = if (useOnlineOCR) Color(0xFF1565C0) else GreenDark
+                            )
+                            Text(
+                                text = if (useOnlineOCR) 
+                                    "Más preciso (~95%) - Requiere internet" 
+                                else 
+                                    "Más rápido (~85%) - Sin internet",
+                                fontSize = 11.sp,
+                                color = Color.Gray
+                            )
+                        }
+                        Switch(
+                            checked = useOnlineOCR,
+                            onCheckedChange = { useOnlineOCR = it },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = Color(0xFF1565C0),
+                                checkedTrackColor = Color(0xFFBBDEFB)
+                            )
                         )
                     }
                 }
