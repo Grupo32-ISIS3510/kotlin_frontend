@@ -59,7 +59,7 @@ fun ReviewScannedItemsScreen(
     }
     var showPurchaseDatePicker by remember { mutableStateOf(false) }
 
-    var editableItems by remember {
+    var editableItems by remember(scannedItems) {
         mutableStateOf(
             scannedItems.mapIndexed { index, item ->
                 val predictedExpiry = ShelfLifePredictor.predictExpiryDate(

@@ -179,6 +179,11 @@ fun AddItemScreen(
         }
     }
 
+    // Limpiar recursos del scanner al salir del composable
+    DisposableEffect(Unit) {
+        onDispose { scanner.close() }
+    }
+
     // Actualizar predicción cuando cambia categoría o fecha de compra
     LaunchedEffect(category, purchaseDate) {
         if (purchaseDate.isNotBlank() && expiryDate.isBlank() && !isScanning) {
@@ -315,7 +320,7 @@ fun AddItemScreen(
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .menuAnchor(),
+                        .menuAnchor(MenuAnchorType.PrimaryNotEditable, true),
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = GreenDark,

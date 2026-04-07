@@ -8,15 +8,10 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -104,6 +99,17 @@ fun ScanReceiptScreen(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         hasCameraPermission = isGranted
+        if (isGranted) {
+            // Lanzar cámara directamente después de conceder el permiso
+            val photoFile = File(context.cacheDir, "receipt_capture.jpg")
+            val photoUri = FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                photoFile
+            )
+            capturedImageUri = photoUri
+            cameraLauncher.launch(photoUri)
+        }
     }
 
     Scaffold(
@@ -188,14 +194,18 @@ fun ScanReceiptScreen(
                     ) {
                         FloatingActionButton(
                             onClick = {
-                                val photoFile = File(context.cacheDir, "receipt_capture.jpg")
-                                val photoUri = FileProvider.getUriForFile(
-                                    context,
-                                    "${context.packageName}.fileprovider",
-                                    photoFile
-                                )
-                                capturedImageUri = photoUri
-                                cameraLauncher.launch(photoUri)
+                                if (hasCameraPermission) {
+                                    val photoFile = File(context.cacheDir, "receipt_capture.jpg")
+                                    val photoUri = FileProvider.getUriForFile(
+                                        context,
+                                        "${context.packageName}.fileprovider",
+                                        photoFile
+                                    )
+                                    capturedImageUri = photoUri
+                                    cameraLauncher.launch(photoUri)
+                                } else {
+                                    permissionLauncher.launch(Manifest.permission.CAMERA)
+                                }
                             },
                             containerColor = GreenDark,
                             contentColor = Color.White,
