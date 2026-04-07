@@ -10,13 +10,23 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.MenuBook
-import androidx.compose.material3.*
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -101,9 +111,29 @@ fun MyApplicationApp() {
                     if (index == 2) {
                         NavigationBarItem(
                             selected = false,
-                            onClick = {},
-                            icon = {},
-                            enabled = false
+                            onClick = {
+                                inventoryViewModel.resetAddItemState()
+                                showAddItem = true
+                            },
+                            icon = {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = Color(0xFF386641),
+                                    modifier = Modifier.size(48.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                        Icon(
+                                            Icons.Default.Add,
+                                            contentDescription = "Agregar producto",
+                                            tint = Color.White
+                                        )
+                                    }
+                                }
+                            },
+                            label = { Text("Agregar") },
+                            colors = NavigationBarItemDefaults.colors(
+                                indicatorColor = Color.Transparent
+                            )
                         )
                     }
                     NavigationBarItem(
@@ -121,20 +151,7 @@ fun MyApplicationApp() {
                     )
                 }
             }
-        },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = {
-                    inventoryViewModel.resetAddItemState()
-                    showAddItem = true
-                },
-                containerColor = Color(0xFF386641),
-                contentColor = Color.White
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Agregar producto")
-            }
-        },
-        floatingActionButtonPosition = FabPosition.Center
+        }
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding)) {
             when (currentDestination) {
