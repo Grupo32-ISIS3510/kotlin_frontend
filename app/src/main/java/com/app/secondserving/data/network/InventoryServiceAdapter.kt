@@ -39,11 +39,13 @@ class InventoryServiceAdapter {
     }
 
     suspend fun deleteInventoryItem(itemId: String): Result<Unit> {
-        return Result.Success(Unit)
+        // TODO: Implementar endpoint de eliminación en backend
+        return Result.Error(IOException("Eliminación aún no implementada en el servidor"))
     }
 
     suspend fun updateInventoryItem(item: FoodItemEntity): Result<FoodItemEntity> {
-        return Result.Success(item)
+        // TODO: Implementar endpoint de actualización en backend
+        return Result.Error(IOException("Actualización aún no implementada en el servidor"))
     }
 }
 

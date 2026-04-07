@@ -181,6 +181,11 @@ class InventoryViewModel(private val repository: InventoryRepository) : ViewMode
                 _addItemState.value = AddItemUiState.Success
                 loadInventory()
             } else if (successCount > 0) {
+                // Éxito parcial: algunos items se agregaron
+                android.util.Log.w(
+                    "InventoryViewModel",
+                    "Bulk create: $successCount exitosos, $errorCount fallidos"
+                )
                 _addItemState.value = AddItemUiState.Success
                 loadInventory()
             } else {

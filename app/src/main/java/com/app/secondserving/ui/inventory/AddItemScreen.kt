@@ -88,6 +88,28 @@ fun AddItemScreen(
         )
     }
 
+    // Función compartida para procesar resultados OCR (usada por cámara y galería)
+    fun processScanResult(result: com.app.secondserving.data.ReceiptScanResult) {
+        if (result.error != null) {
+            Toast.makeText(context, result.error, Toast.LENGTH_LONG).show()
+        } else if (result.items.isNotEmpty()) {
+            val firstItem = result.items.first()
+            name = firstItem.name
+            category = firstItem.category.ifBlank { "Otros" }
+            quantity = "1"
+            purchaseDate = result.purchaseDate ?: LocalDate.now().toString()
+            predictedExpiryDate = ShelfLifePredictor.predictExpiryDate(
+                purchaseDateStr = purchaseDate,
+                category = category
+            )
+            storageTip = ShelfLifePredictor.getStorageRecommendation(category)
+            showPredictionTip = true
+            expiryDate = predictedExpiryDate
+        } else {
+            Toast.makeText(context, "No se detectaron productos en la imagen", Toast.LENGTH_LONG).show()
+        }
+    }
+
     // Launcher para cámara
     val cameraLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.TakePicture()
@@ -97,25 +119,7 @@ fun AddItemScreen(
             scope.launch {
                 try {
                     val result = scanner.scanReceipt(capturedImageUri!!)
-                    if (result.error != null) {
-                        Toast.makeText(context, result.error, Toast.LENGTH_LONG).show()
-                    } else if (result.items.isNotEmpty()) {
-                        // Llenar campos con el primer producto detectado
-                        val firstItem = result.items.first()
-                        name = firstItem.name
-                        category = firstItem.category.ifBlank { "Otros" }
-                        quantity = "1"
-                        purchaseDate = result.purchaseDate ?: LocalDate.now().toString()
-                        predictedExpiryDate = ShelfLifePredictor.predictExpiryDate(
-                            purchaseDateStr = purchaseDate,
-                            category = category
-                        )
-                        storageTip = ShelfLifePredictor.getStorageRecommendation(category)
-                        showPredictionTip = true
-                        expiryDate = predictedExpiryDate
-                    } else {
-                        Toast.makeText(context, "No se detectaron productos en la imagen", Toast.LENGTH_LONG).show()
-                    }
+                    processScanResult(result)
                 } catch (e: Exception) {
                     Toast.makeText(context, "Error al procesar: ${e.message}", Toast.LENGTH_LONG).show()
                 } finally {
@@ -134,24 +138,7 @@ fun AddItemScreen(
             scope.launch {
                 try {
                     val result = scanner.scanReceipt(it)
-                    if (result.error != null) {
-                        Toast.makeText(context, result.error, Toast.LENGTH_LONG).show()
-                    } else if (result.items.isNotEmpty()) {
-                        val firstItem = result.items.first()
-                        name = firstItem.name
-                        category = firstItem.category.ifBlank { "Otros" }
-                        quantity = "1"
-                        purchaseDate = result.purchaseDate ?: LocalDate.now().toString()
-                        predictedExpiryDate = ShelfLifePredictor.predictExpiryDate(
-                            purchaseDateStr = purchaseDate,
-                            category = category
-                        )
-                        storageTip = ShelfLifePredictor.getStorageRecommendation(category)
-                        showPredictionTip = true
-                        expiryDate = predictedExpiryDate
-                    } else {
-                        Toast.makeText(context, "No se detectaron productos en la imagen", Toast.LENGTH_LONG).show()
-                    }
+                    processScanResult(result)
                 } catch (e: Exception) {
                     Toast.makeText(context, "Error al procesar: ${e.message}", Toast.LENGTH_LONG).show()
                 } finally {

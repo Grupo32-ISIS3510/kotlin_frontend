@@ -242,9 +242,7 @@ class ReceiptScanner(private val context: Context) {
 
         // Buscar total
         for (line in lines.reversed().take(10)) {
-            if (line.contains("TOTAL", ignoreCase = true) || 
-                line.contains("Total", ignoreCase = true) || 
-                line.contains("total", ignoreCase = true)) {
+            if (line.contains("TOTAL", ignoreCase = true)) {
                 val priceMatch = pricePattern.find(line)
                 if (priceMatch != null) {
                     totalAmount = priceMatch.groupValues[1].replace(",", ".").toDoubleOrNull()

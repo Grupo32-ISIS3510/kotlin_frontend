@@ -42,6 +42,8 @@ class SecondServingApp : Application() {
     }
 
     fun registerFcmToken(token: String) {
+        if (sessionManager.getToken() == null) return
+
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val response = RetrofitClient.authInstance.registerFcmToken(mapOf("token" to token))

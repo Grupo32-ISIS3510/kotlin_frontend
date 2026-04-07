@@ -81,7 +81,11 @@ class ExpirationNotifier(
                     }
                 }
             } catch (e: Exception) {
-                // Ignorar items con fecha inválida
+                android.util.Log.w(
+                    "ExpirationNotifier",
+                    "Fecha inválida para item ${item.id} (${item.name}): ${item.expiryDate}",
+                    e
+                )
             }
         }
     }
