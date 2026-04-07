@@ -69,7 +69,7 @@ fun ScanReceiptScreen(
                     Toast.makeText(context, "No se detectaron productos en la imagen", Toast.LENGTH_LONG).show()
                 }
             } catch (e: Exception) {
-                Toast.makeText(context, "Error al procesar: ${e.message}", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, "No se pudo procesar la imagen. Intenta con otra foto.", Toast.LENGTH_LONG).show()
             } finally {
                 isProcessing = false
             }

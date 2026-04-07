@@ -196,7 +196,7 @@ fun InventoryScreen(
 
         OutlinedTextField(
             value = searchQuery,
-            onValueChange = { viewModel.onSearchQueryChange(it) },
+            onValueChange = { if (it.length <= 100) viewModel.onSearchQueryChange(it) },
             placeholder = { Text("Buscar alimentos...", color = Color.Gray) },
             leadingIcon = {
                 Icon(Icons.Default.Search, contentDescription = null, tint = Color.Gray)

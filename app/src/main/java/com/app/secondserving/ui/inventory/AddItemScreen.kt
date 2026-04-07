@@ -121,7 +121,7 @@ fun AddItemScreen(
                     val result = scanner.scanReceipt(capturedImageUri!!)
                     processScanResult(result)
                 } catch (e: Exception) {
-                    Toast.makeText(context, "Error al procesar: ${e.message}", Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, "No se pudo procesar la imagen. Intenta con otra foto.", Toast.LENGTH_LONG).show()
                 } finally {
                     isScanning = false
                 }
@@ -140,7 +140,7 @@ fun AddItemScreen(
                     val result = scanner.scanReceipt(it)
                     processScanResult(result)
                 } catch (e: Exception) {
-                    Toast.makeText(context, "Error al procesar: ${e.message}", Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, "No se pudo procesar la imagen. Intenta con otra foto.", Toast.LENGTH_LONG).show()
                 } finally {
                     isScanning = false
                 }
@@ -281,7 +281,7 @@ fun AddItemScreen(
             // Nombre
             OutlinedTextField(
                 value = name,
-                onValueChange = { name = it; nameError = false },
+                onValueChange = { if (it.length <= 50) { name = it; nameError = false } },
                 label = { Text("Nombre *") },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
@@ -330,7 +330,7 @@ fun AddItemScreen(
             // Cantidad
             OutlinedTextField(
                 value = quantity,
-                onValueChange = { quantity = it; quantityError = false },
+                onValueChange = { if (it.length <= 10) { quantity = it; quantityError = false } },
                 label = { Text("Cantidad *") },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),

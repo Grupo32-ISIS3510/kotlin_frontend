@@ -451,7 +451,7 @@ private fun EditableItemCard(
             // Name field
             OutlinedTextField(
                 value = item.name,
-                onValueChange = onNameChange,
+                onValueChange = { if (it.length <= 50) onNameChange(it) },
                 label = { Text("Nombre del producto") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
@@ -470,8 +470,10 @@ private fun EditableItemCard(
                 OutlinedTextField(
                     value = item.quantity.toString(),
                     onValueChange = {
-                        it.toDoubleOrNull()?.let { qty -> onQuantityChange(qty) }
-                        if (it.isEmpty()) onQuantityChange(0.0)
+                        if (it.length <= 10) {
+                            it.toDoubleOrNull()?.let { qty -> onQuantityChange(qty) }
+                            if (it.isEmpty()) onQuantityChange(0.0)
+                        }
                     },
                     label = { Text("Cantidad") },
                     modifier = Modifier.weight(1f),
@@ -487,8 +489,10 @@ private fun EditableItemCard(
                 OutlinedTextField(
                     value = if (item.price != null) item.price.toString() else "",
                     onValueChange = {
-                        if (it.isEmpty()) onPriceChange(null)
-                        else it.toDoubleOrNull()?.let { price -> onPriceChange(price) }
+                        if (it.length <= 15) {
+                            if (it.isEmpty()) onPriceChange(null)
+                            else it.toDoubleOrNull()?.let { price -> onPriceChange(price) }
+                        }
                     },
                     label = { Text("Precio (opcional)") },
                     modifier = Modifier.weight(1f),
@@ -546,7 +550,7 @@ private fun EditableItemCard(
             // Expiry date
             OutlinedTextField(
                 value = item.expiryDate,
-                onValueChange = onExpiryDateChange,
+                onValueChange = { if (it.length <= 10) onExpiryDateChange(it) },
                 label = { Text("Fecha de vencimiento (YYYY-MM-DD)") },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
@@ -581,7 +585,7 @@ private fun AddItemDialog(
             ) {
                 OutlinedTextField(
                     value = name,
-                    onValueChange = { name = it },
+                    onValueChange = { if (it.length <= 50) name = it },
                     label = { Text("Nombre") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
@@ -591,7 +595,7 @@ private fun AddItemDialog(
                 ) {
                     OutlinedTextField(
                         value = quantity,
-                        onValueChange = { quantity = it },
+                        onValueChange = { if (it.length <= 10) quantity = it },
                         label = { Text("Cantidad") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         singleLine = true,
@@ -599,7 +603,7 @@ private fun AddItemDialog(
                     )
                     OutlinedTextField(
                         value = price,
-                        onValueChange = { price = it },
+                        onValueChange = { if (it.length <= 15) price = it },
                         label = { Text("Precio (opcional)") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         singleLine = true,
