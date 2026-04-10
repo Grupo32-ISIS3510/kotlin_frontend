@@ -14,8 +14,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -45,7 +46,8 @@ private val DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd")
 @Composable
 fun AddItemScreen(
     viewModel: InventoryViewModel,
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    onOpenScanner: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -203,12 +205,17 @@ fun AddItemScreen(
                     Text(
                         "Agregar alimento",
                         fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp
+                        fontSize = 20.sp,
+                        color = GreenDark
                     )
                 },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Volver")
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Volver a la despensa",
+                            tint = GreenDark
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -227,6 +234,57 @@ fun AddItemScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Spacer(modifier = Modifier.height(8.dp))
+
+            // Botón de escanear con cámara
+            Card(
+                onClick = onOpenScanner,
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = GreenDark),
+                elevation = CardDefaults.cardElevation(4.dp),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.QrCodeScanner,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(36.dp)
+                    )
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        Text(
+                            text = "Escanear con cámara",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp,
+                            color = Color.White
+                        )
+                        Text(
+                            text = "Detecta productos automáticamente",
+                            fontSize = 13.sp,
+                            color = Color(0xFFE8F5E9)
+                        )
+                    }
+                }
+            }
+
+            // Divider
+            HorizontalDivider(color = Color(0xFFE0E0E0), thickness = 1.dp)
+
+            // Título del formulario
+            Text(
+                text = "Datos del producto",
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp,
+                color = Color(0xFF333333)
+            )
 
             // Nombre
             OutlinedTextField(
@@ -464,68 +522,6 @@ fun AddItemScreen(
                 )
             }
 
-            // Botón de escáner OCR - Central en el formulario
-            Card(
-                onClick = {
-                    if (hasCameraPermission) {
-                        val photoFile = File(context.cacheDir, "receipt_capture.jpg")
-                        val photoUri = FileProvider.getUriForFile(
-                            context,
-                            "${context.packageName}.fileprovider",
-                            photoFile
-                        )
-                        capturedImageUri = photoUri
-                        cameraLauncher.launch(photoUri)
-                    } else {
-                        permissionLauncher.launch(Manifest.permission.CAMERA)
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = GreenDark
-                ),
-                elevation = CardDefaults.cardElevation(4.dp)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(20.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.QrCodeScanner,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(40.dp)
-                    )
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Text(
-                            text = "📷 Escanear con cámara",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp,
-                            color = Color.White
-                        )
-                        Text(
-                            text = "Detecta productos automáticamente",
-                            fontSize = 13.sp,
-                            color = Color(0xFFE8F5E9)
-                        )
-                    }
-                    if (isScanning) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(28.dp),
-                            color = Color.White,
-                            strokeWidth = 3.dp
-                        )
-                    }
-                }
-            }
-
             // Error general
             if (addItemState is AddItemUiState.Error) {
                 Surface(
@@ -583,7 +579,8 @@ fun AddItemScreen(
                     Text(
                         "Guardar alimento",
                         fontSize = 16.sp,
-                        fontWeight = FontWeight.SemiBold
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White
                     )
                 }
             }

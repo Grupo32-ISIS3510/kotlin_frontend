@@ -9,17 +9,29 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.List
-import androidx.compose.material.icons.filled.MenuBook
-import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -27,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.app.secondserving.data.InventoryRepository
@@ -37,6 +50,7 @@ import com.app.secondserving.ui.inventory.InventoryScreen
 import com.app.secondserving.ui.inventory.InventoryViewModel
 import com.app.secondserving.ui.inventory.InventoryViewModelFactory
 import com.app.secondserving.ui.inventory.ItemDetailScreen
+import com.app.secondserving.ui.inventory.ReviewScannedItemsScreen
 import com.app.secondserving.ui.inventory.ScanReceiptScreen
 import com.app.secondserving.ui.inventory.WeatherViewModel
 import com.app.secondserving.ui.theme.MyApplicationTheme
@@ -55,15 +69,20 @@ class MainActivity : ComponentActivity() {
 
 enum class AppDestinations(val label: String, val icon: ImageVector) {
     INICIO("Inicio", Icons.Default.Home),
-    DESPENSA("Despensa", Icons.Default.List),
-    RECETAS("Recetas", Icons.Default.MenuBook),
+    DESPENSA("Despensa", Icons.AutoMirrored.Filled.List),
+    RECETAS("Recetas", Icons.AutoMirrored.Filled.MenuBook),
     PERFIL("Perfil", Icons.Default.AccountCircle),
 }
 
 @Composable
 fun MyApplicationApp() {
     var currentDestination by rememberSaveable { mutableStateOf(AppDestinations.DESPENSA) }
-    var showAddItem by remember { mutableStateOf(false) }
+    var showAddItem by rememberSaveable { mutableStateOf(false) }
+    var showScanFromAdd by rememberSaveable { mutableStateOf(false) }
+    var showReviewItems by rememberSaveable { mutableStateOf(false) }
+    // Data kept in regular remember - will reset on rotation but navigation state is preserved
+    var scannedItems by remember { mutableStateOf<List<ScannedItem>?>(null) }
+    var scannedPurchaseDate by remember { mutableStateOf<String?>(null) }
     var selectedItem by remember { mutableStateOf<InventoryItemUi?>(null) }
     var selectedItemTip by remember { mutableStateOf("") }
     // Pedir permiso de notificaciones (Android 13+)
@@ -91,15 +110,86 @@ fun MyApplicationApp() {
         )
     )
 
+    // Flujo de escaneo desde AddItemScreen: Escanear → Revisión → Guardar
+    if (showScanFromAdd) {
+        androidx.activity.compose.BackHandler {
+            showScanFromAdd = false
+            showAddItem = true
+        }
+        ScanReceiptScreen(
+            onItemsScanned = { items, date ->
+                scannedItems = items
+                scannedPurchaseDate = date
+                showScanFromAdd = false
+                showReviewItems = true
+            },
+            onNavigateBack = {
+                showScanFromAdd = false
+                showAddItem = true
+            }
+        )
+        return
+    }
+
+    if (showReviewItems && scannedItems != null) {
+        androidx.activity.compose.BackHandler {
+            showReviewItems = false
+            scannedItems = null
+            scannedPurchaseDate = null
+            showScanFromAdd = true
+        }
+        ReviewScannedItemsScreen(
+            scannedItems = scannedItems!!,
+            purchaseDate = scannedPurchaseDate,
+            onSaveItems = { items, date ->
+                inventoryViewModel.createInventoryItemsBulk(
+                    items.map { editable ->
+                        ScannedItem(
+                            name = editable.name,
+                            price = editable.price,
+                            category = editable.category
+                        )
+                    },
+                    date
+                )
+                showReviewItems = false
+                scannedItems = null
+                scannedPurchaseDate = null
+                showAddItem = false
+            },
+            onNavigateBack = {
+                showReviewItems = false
+                scannedItems = null
+                scannedPurchaseDate = null
+                showScanFromAdd = true
+            }
+        )
+        return
+    } else if (showReviewItems && scannedItems == null) {
+        // Data lost on rotation, go back
+        showReviewItems = false
+    }
+
     if (showAddItem) {
+        androidx.activity.compose.BackHandler {
+            showAddItem = false
+        }
         AddItemScreen(
             viewModel = inventoryViewModel,
-            onNavigateBack = { showAddItem = false }
+            onNavigateBack = { showAddItem = false },
+            onOpenScanner = {
+                showAddItem = false
+                showScanFromAdd = true
+            }
         )
         return
     }
 
     if (selectedItem != null) {
+        androidx.activity.compose.BackHandler {
+            selectedItem = null
+            selectedItemTip = ""
+        }
         val weatherVm: WeatherViewModel = viewModel()
         ItemDetailScreen(
             item = selectedItem!!,
@@ -110,52 +200,82 @@ fun MyApplicationApp() {
         return
     }
 
+    val green = Color(0xFF386641)
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         bottomBar = {
-            NavigationBar(containerColor = Color.White) {
-                AppDestinations.entries.forEachIndexed { index, destination ->
-                    if (index == 2) {
-                        NavigationBarItem(
-                            selected = false,
-                            onClick = {},
-                            icon = {},
-                            enabled = false
-                        )
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .windowInsetsPadding(WindowInsets.navigationBars),
+                color = Color.White,
+                shadowElevation = 8.dp
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 2.dp, bottom = 4.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    NavItem(
+                        label = "Inicio",
+                        icon = Icons.Default.Home,
+                        selected = currentDestination == AppDestinations.INICIO,
+                        onClick = { currentDestination = AppDestinations.INICIO },
+                        modifier = Modifier.weight(1f)
+                    )
+                    NavItem(
+                        label = "Despensa",
+                        icon = Icons.AutoMirrored.Filled.List,
+                        selected = currentDestination == AppDestinations.DESPENSA,
+                        onClick = { currentDestination = AppDestinations.DESPENSA },
+                        modifier = Modifier.weight(1f)
+                    )
+                    Box(
+                        modifier = Modifier.weight(1.2f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        FloatingActionButton(
+                            onClick = {
+                                inventoryViewModel.resetAddItemState()
+                                showAddItem = true
+                            },
+                            containerColor = green,
+                            contentColor = Color.White,
+                            shape = CircleShape
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = "Agregar producto",
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
                     }
-                    NavigationBarItem(
-                        selected = currentDestination == destination,
-                        onClick = { currentDestination = destination },
-                        icon = {
-                            Icon(destination.icon, contentDescription = destination.label)
-                        },
-                        label = { Text(destination.label) },
-                        colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = Color(0xFF386641),
-                            selectedTextColor = Color(0xFF386641),
-                            indicatorColor = Color(0x1A386641)
-                        )
+                    NavItem(
+                        label = "Recetas",
+                        icon = Icons.AutoMirrored.Filled.MenuBook,
+                        selected = currentDestination == AppDestinations.RECETAS,
+                        onClick = { currentDestination = AppDestinations.RECETAS },
+                        modifier = Modifier.weight(1f)
+                    )
+                    NavItem(
+                        label = "Perfil",
+                        icon = Icons.Default.AccountCircle,
+                        selected = currentDestination == AppDestinations.PERFIL,
+                        onClick = { currentDestination = AppDestinations.PERFIL },
+                        modifier = Modifier.weight(1f)
                     )
                 }
             }
-        },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = {
-                    inventoryViewModel.resetAddItemState()
-                    showAddItem = true
-                },
-                containerColor = Color(0xFF386641),
-                contentColor = Color.White
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "Agregar producto"
-                )
-            }
         }
     ) { innerPadding ->
-        Box(modifier = Modifier.padding(innerPadding)) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+        ) {
             when (currentDestination) {
                 AppDestinations.DESPENSA -> InventoryScreen(
                     viewModel = inventoryViewModel,
@@ -176,5 +296,37 @@ fun MyApplicationApp() {
 private fun PlaceholderScreen(name: String) {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Text(text = name, style = MaterialTheme.typography.headlineMedium, color = Color.Gray)
+    }
+}
+
+@Composable
+private fun NavItem(
+    label: String,
+    icon: ImageVector,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val green = Color(0xFF386641)
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(0.dp)
+    ) {
+        IconButton(onClick = onClick, modifier = Modifier.size(36.dp)) {
+            Icon(
+                icon,
+                contentDescription = label,
+                tint = if (selected) green else Color.Gray,
+                modifier = Modifier.size(22.dp)
+            )
+        }
+        Text(
+            label,
+            fontSize = 10.sp,
+            lineHeight = 12.sp,
+            maxLines = 1,
+            color = if (selected) green else Color.Gray
+        )
     }
 }

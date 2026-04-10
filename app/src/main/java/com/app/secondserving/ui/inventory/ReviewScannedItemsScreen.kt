@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -24,10 +25,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.app.secondserving.data.ScannedItem
+import com.app.secondserving.data.ShelfLifePredictor
 import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 
 private val GreenDark = Color(0xFF386641)
 private val BackgroundColor = Color(0xFFF5F5F0)
+private val DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd")
 
 /**
  * Item editable para la pantalla de revisión.
@@ -46,23 +50,43 @@ data class EditableScannedItem(
 fun ReviewScannedItemsScreen(
     scannedItems: List<ScannedItem>,
     purchaseDate: String?,
-    onSaveItems: (List<ScannedItem>, String?) -> Unit,
+    onSaveItems: (List<EditableScannedItem>, String?) -> Unit,
     onNavigateBack: () -> Unit
 ) {
+    val today = LocalDate.now()
+    var selectedPurchaseDate by remember {
+        mutableStateOf(purchaseDate ?: today.format(DATE_FORMAT))
+    }
+    var showPurchaseDatePicker by remember { mutableStateOf(false) }
+
     var editableItems by remember {
         mutableStateOf(
             scannedItems.mapIndexed { index, item ->
+                val predictedExpiry = ShelfLifePredictor.predictExpiryDate(
+                    selectedPurchaseDate,
+                    item.category
+                )
                 EditableScannedItem(
                     id = index,
                     name = item.name,
                     quantity = 1.0,
                     price = item.price,
                     category = item.category,
-                    expiryDate = LocalDate.now().plusDays(7).toString()
+                    expiryDate = predictedExpiry
                 )
             }
         )
     }
+
+    // Update expiry dates when purchase date changes
+    val currentDate = selectedPurchaseDate
+    LaunchedEffect(currentDate) {
+        editableItems = editableItems.map { item ->
+            val predictedExpiry = ShelfLifePredictor.predictExpiryDate(currentDate, item.category)
+            item.copy(expiryDate = predictedExpiry)
+        }
+    }
+
     var showDeleteDialog by remember { mutableStateOf<Int?>(null) }
     var showAddItemDialog by remember { mutableStateOf(false) }
     var isSaving by remember { mutableStateOf(false) }
@@ -89,14 +113,7 @@ fun ReviewScannedItemsScreen(
                     TextButton(
                         onClick = {
                             isSaving = true
-                            val itemsToSave = editableItems.map { item ->
-                                ScannedItem(
-                                    name = item.name,
-                                    price = item.price,
-                                    category = item.category
-                                )
-                            }
-                            onSaveItems(itemsToSave, purchaseDate)
+                            onSaveItems(editableItems, selectedPurchaseDate)
                         },
                         enabled = editableItems.isNotEmpty() && !isSaving
                     ) {
@@ -163,6 +180,74 @@ fun ReviewScannedItemsScreen(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
+                    // Header with purchase date and summary
+                    item {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFFE8F5E9)),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            Icons.Default.CalendarToday,
+                                            contentDescription = null,
+                                            tint = GreenDark,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "Fecha de compra:",
+                                            fontWeight = FontWeight.SemiBold,
+                                            fontSize = 14.sp,
+                                            color = GreenDark
+                                        )
+                                    }
+                                    TextButton(onClick = { showPurchaseDatePicker = true }) {
+                                        Text(
+                                            text = selectedPurchaseDate,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 14.sp,
+                                            color = GreenDark
+                                        )
+                                        Icon(
+                                            Icons.Default.Edit,
+                                            contentDescription = "Cambiar fecha",
+                                            tint = GreenDark,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = "${editableItems.size} producto${if (editableItems.size != 1) "s" else ""}",
+                                        fontSize = 13.sp,
+                                        color = Color(0xFF555555)
+                                    )
+                                    Text(
+                                        text = "Total: $${String.format("%.2f", totalAmount)}",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp,
+                                        color = GreenDark
+                                    )
+                                }
+                            }
+                        }
+                    }
+
                     itemsIndexed(editableItems, key = { _, item -> item.id }) { index, item ->
                         EditableItemCard(
                             item = item,
@@ -228,6 +313,45 @@ fun ReviewScannedItemsScreen(
                 }
             }
         }
+    }
+
+    // Purchase date picker dialog
+    if (showPurchaseDatePicker) {
+        var selectedYear by remember { mutableIntStateOf(today.year) }
+        var selectedMonth by remember { mutableIntStateOf(today.monthValue - 1) }
+        var selectedDay by remember { mutableIntStateOf(today.dayOfMonth) }
+
+        AlertDialog(
+            onDismissRequest = { showPurchaseDatePicker = false },
+            title = { Text("Fecha de compra") },
+            text = {
+                android.widget.DatePicker(
+                    androidx.compose.ui.platform.LocalContext.current
+                ).apply {
+                    updateDate(selectedYear, selectedMonth, selectedDay)
+                    setOnDateChangedListener { _, year, month, day ->
+                        selectedYear = year
+                        selectedMonth = month
+                        selectedDay = day
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        selectedPurchaseDate = String.format("%04d-%02d-%02d", selectedYear, selectedMonth + 1, selectedDay)
+                        showPurchaseDatePicker = false
+                    }
+                ) {
+                    Text("OK")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPurchaseDatePicker = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
     }
 
     // Delete confirmation dialog
@@ -337,19 +461,19 @@ private fun EditableItemCard(
                 )
             )
 
-            // Quantity, Price, Category row
+            // Quantity and Price in a row (2 columns)
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 // Quantity
                 OutlinedTextField(
                     value = item.quantity.toString(),
-                    onValueChange = { 
-                        it.toDoubleOrNull()?.let { qty -> onQuantityChange(qty) } 
+                    onValueChange = {
+                        it.toDoubleOrNull()?.let { qty -> onQuantityChange(qty) }
                         if (it.isEmpty()) onQuantityChange(0.0)
                     },
-                    label = { Text("Cant.") },
+                    label = { Text("Cantidad") },
                     modifier = Modifier.weight(1f),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true,
@@ -361,12 +485,12 @@ private fun EditableItemCard(
 
                 // Price
                 OutlinedTextField(
-                    value = item.price?.toString() ?: "",
-                    onValueChange = { 
+                    value = if (item.price != null) item.price.toString() else "",
+                    onValueChange = {
                         if (it.isEmpty()) onPriceChange(null)
                         else it.toDoubleOrNull()?.let { price -> onPriceChange(price) }
                     },
-                    label = { Text("Precio") },
+                    label = { Text("Precio (opcional)") },
                     modifier = Modifier.weight(1f),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true,
@@ -375,46 +499,46 @@ private fun EditableItemCard(
                         focusedLabelColor = GreenDark
                     )
                 )
+            }
 
-                // Category dropdown
-                ExposedDropdownMenuBox(
-                    expanded = categoryExpanded,
-                    onExpandedChange = { categoryExpanded = it }
-                ) {
-                    OutlinedTextField(
-                        value = item.category,
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Categoría") },
-                        modifier = Modifier
-                            .weight(1.5f)
-                            .menuAnchor(),
-                        trailingIcon = {
-                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = categoryExpanded)
-                        },
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = GreenDark,
-                            focusedLabelColor = GreenDark
-                        )
+            // Category dropdown - full width
+            ExposedDropdownMenuBox(
+                expanded = categoryExpanded,
+                onExpandedChange = { categoryExpanded = it }
+            ) {
+                OutlinedTextField(
+                    value = item.category,
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Categoría") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .menuAnchor(MenuAnchorType.PrimaryNotEditable, true),
+                    trailingIcon = {
+                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = categoryExpanded)
+                    },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = GreenDark,
+                        focusedLabelColor = GreenDark
                     )
-                    ExposedDropdownMenu(
-                        expanded = categoryExpanded,
-                        onDismissRequest = { categoryExpanded = false }
-                    ) {
-                        val categories = listOf(
-                            "Lácteos", "Carnes", "Pescados", "Frutas", 
-                            "Verduras", "Granos", "Bebidas", "Condimentos", 
-                            "Enlatados", "Otros"
+                )
+                ExposedDropdownMenu(
+                    expanded = categoryExpanded,
+                    onDismissRequest = { categoryExpanded = false }
+                ) {
+                    val categories = listOf(
+                        "Lácteos", "Carnes", "Pescados", "Frutas",
+                        "Verduras", "Granos", "Bebidas", "Condimentos",
+                        "Enlatados", "Otros"
+                    )
+                    categories.forEach { category ->
+                        DropdownMenuItem(
+                            text = { Text(category) },
+                            onClick = {
+                                onCategoryChange(category)
+                                categoryExpanded = false
+                            }
                         )
-                        categories.forEach { category ->
-                            DropdownMenuItem(
-                                text = { Text(category) },
-                                onClick = {
-                                    onCategoryChange(category)
-                                    categoryExpanded = false
-                                }
-                            )
-                        }
                     }
                 }
             }
@@ -493,7 +617,7 @@ private fun AddItemDialog(
                         label = { Text("Categoría") },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .menuAnchor(),
+                            .menuAnchor(MenuAnchorType.PrimaryNotEditable, true),
                         trailingIcon = {
                             ExposedDropdownMenuDefaults.TrailingIcon(expanded = categoryExpanded)
                         }
