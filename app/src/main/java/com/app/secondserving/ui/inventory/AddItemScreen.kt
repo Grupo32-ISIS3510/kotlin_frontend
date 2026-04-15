@@ -8,6 +8,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,16 +19,22 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import com.app.secondserving.data.ShelfLifePredictor
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 
 private val GreenDark = Color(0xFF386641)
 private val BackgroundColor = Color(0xFFF5F5F0)
 private val CATEGORIES = listOf("Frutas", "Verduras", "Lácteos", "Carnes", "Otros")
+private val DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddItemScreen(
     viewModel: InventoryViewModel,
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    onOpenScanner: (() -> Unit)? = null
 ) {
     val addItemState by viewModel.addItemState.collectAsState()
 
@@ -41,6 +49,27 @@ fun AddItemScreen(
     var quantityError by remember { mutableStateOf(false) }
     var purchaseDateError by remember { mutableStateOf(false) }
     var expiryDateError by remember { mutableStateOf(false) }
+
+    // Predicción automática de fecha de expiración
+    var showPredictionTip by remember { mutableStateOf(false) }
+    var predictedExpiryDate by remember { mutableStateOf("") }
+    var storageTip by remember { mutableStateOf("") }
+
+    // Selectores de fecha
+    var showPurchaseDatePicker by remember { mutableStateOf(false) }
+    var showExpiryDatePicker by remember { mutableStateOf(false) }
+
+    // Actualizar predicción cuando cambia categoría o fecha de compra
+    LaunchedEffect(category, purchaseDate) {
+        if (purchaseDate.isNotBlank() && expiryDate.isBlank()) {
+            predictedExpiryDate = ShelfLifePredictor.predictExpiryDate(
+                purchaseDateStr = purchaseDate,
+                category = category
+            )
+            storageTip = ShelfLifePredictor.getStorageRecommendation(category)
+            showPredictionTip = true
+        }
+    }
 
     // Navegar atrás al éxito
     LaunchedEffect(addItemState) {
@@ -62,6 +91,27 @@ fun AddItemScreen(
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Volver")
+                    }
+                },
+                actions = {
+                    // Botón para escanear factura
+                    if (onOpenScanner != null) {
+                        IconButton(onClick = onOpenScanner) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Icon(
+                                    Icons.Default.QrCodeScanner,
+                                    contentDescription = "Escanear factura",
+                                    tint = GreenDark
+                                )
+                                Text(
+                                    text = "Escanear",
+                                    fontSize = 10.sp,
+                                    color = GreenDark
+                                )
+                            }
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -147,15 +197,21 @@ fun AddItemScreen(
                 singleLine = true
             )
 
-            // Fecha de compra
+            // Fecha de compra con botón de calendario
             OutlinedTextField(
                 value = purchaseDate,
-                onValueChange = { purchaseDate = it; purchaseDateError = false },
-                label = { Text("Fecha de compra * (YYYY-MM-DD)") },
+                onValueChange = {},
+                readOnly = true,
+                label = { Text("Fecha de compra *") },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 isError = purchaseDateError,
-                supportingText = { if (purchaseDateError) Text("Formato: 2025-04-01") },
+                supportingText = { if (purchaseDateError) Text("Campo requerido") },
+                trailingIcon = {
+                    IconButton(onClick = { showPurchaseDatePicker = true }) {
+                        Icon(Icons.Default.CalendarToday, contentDescription = "Seleccionar fecha")
+                    }
+                },
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = GreenDark,
                     focusedLabelColor = GreenDark
@@ -163,21 +219,153 @@ fun AddItemScreen(
                 singleLine = true
             )
 
-            // Fecha de vencimiento
+            // Dialog selector de fecha de compra
+            if (showPurchaseDatePicker) {
+                var selectedYear by remember { mutableStateOf(LocalDate.now().year) }
+                var selectedMonth by remember { mutableStateOf(LocalDate.now().monthValue - 1) }
+                var selectedDay by remember { mutableStateOf(LocalDate.now().dayOfMonth) }
+                
+                AlertDialog(
+                    onDismissRequest = { showPurchaseDatePicker = false },
+                    title = { Text("Fecha de compra") },
+                    text = {
+                        android.widget.DatePicker(
+                            androidx.compose.ui.platform.LocalContext.current,
+                            null,
+                            android.R.attr.datePickerStyle
+                        ).apply {
+                            updateDate(selectedYear, selectedMonth, selectedDay)
+                            setOnDateChangedListener { _, year, month, day ->
+                                selectedYear = year
+                                selectedMonth = month
+                                selectedDay = day
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                val date = String.format("%04d-%02d-%02d", selectedYear, selectedMonth + 1, selectedDay)
+                                purchaseDate = date
+                                purchaseDateError = false
+                                showPredictionTip = false
+                                showPurchaseDatePicker = false
+                            }
+                        ) {
+                            Text("OK")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showPurchaseDatePicker = false }) {
+                            Text("Cancelar")
+                        }
+                    }
+                )
+            }
+
+            // Tip de predicción
+            if (showPredictionTip && predictedExpiryDate.isNotBlank()) {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0xFFE8F5E9),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, GreenDark.copy(alpha = 0.3f))
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = "💡 Predicción de vida útil",
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 14.sp,
+                            color = GreenDark
+                        )
+                        Text(
+                            text = "Fecha de expiración estimada: $predictedExpiryDate",
+                            fontSize = 13.sp,
+                            color = Color(0xFF2E7D32)
+                        )
+                        Text(
+                            text = "Almacenamiento recomendado: ${storageTip.ifBlank { "ambiente" }}",
+                            fontSize = 13.sp,
+                            color = Color(0xFF555555)
+                        )
+                        Text(
+                            text = "Puedes editar la fecha manualmente si lo prefieres",
+                            fontSize = 12.sp,
+                            color = Color(0xFF888888),
+                            fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                        )
+                    }
+                }
+            }
+
+            // Fecha de vencimiento con botón de calendario
             OutlinedTextField(
                 value = expiryDate,
-                onValueChange = { expiryDate = it; expiryDateError = false },
-                label = { Text("Fecha de vencimiento * (YYYY-MM-DD)") },
+                onValueChange = {},
+                readOnly = true,
+                label = { Text("Fecha de vencimiento *") },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 isError = expiryDateError,
-                supportingText = { if (expiryDateError) Text("Formato: 2025-04-01") },
+                supportingText = { if (expiryDateError) Text("Campo requerido") },
+                trailingIcon = {
+                    IconButton(onClick = { showExpiryDatePicker = true }) {
+                        Icon(Icons.Default.CalendarToday, contentDescription = "Seleccionar fecha")
+                    }
+                },
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = GreenDark,
                     focusedLabelColor = GreenDark
                 ),
                 singleLine = true
             )
+
+            // Dialog selector de fecha de expiración
+            if (showExpiryDatePicker) {
+                var expYear by remember { mutableStateOf(LocalDate.now().year) }
+                var expMonth by remember { mutableStateOf(LocalDate.now().monthValue - 1) }
+                var expDay by remember { mutableStateOf(LocalDate.now().dayOfMonth) }
+                
+                AlertDialog(
+                    onDismissRequest = { showExpiryDatePicker = false },
+                    title = { Text("Fecha de vencimiento") },
+                    text = {
+                        android.widget.DatePicker(
+                            androidx.compose.ui.platform.LocalContext.current,
+                            null,
+                            android.R.attr.datePickerStyle
+                        ).apply {
+                            updateDate(expYear, expMonth, expDay)
+                            setOnDateChangedListener { _, year, month, day ->
+                                expYear = year
+                                expMonth = month
+                                expDay = day
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                val date = String.format("%04d-%02d-%02d", expYear, expMonth + 1, expDay)
+                                expiryDate = date
+                                expiryDateError = false
+                                showPredictionTip = false
+                                showExpiryDatePicker = false
+                            }
+                        ) {
+                            Text("OK")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showExpiryDatePicker = false }) {
+                            Text("Cancelar")
+                        }
+                    }
+                )
+            }
 
             // Error general
             if (addItemState is AddItemUiState.Error) {
@@ -200,7 +388,14 @@ fun AddItemScreen(
                     nameError = name.isBlank()
                     quantityError = quantity.toDoubleOrNull() == null
                     purchaseDateError = purchaseDate.isBlank()
-                    expiryDateError = expiryDate.isBlank()
+                    
+                    // Usar predicción si no hay fecha de expiración
+                    val finalExpiryDate = if (expiryDate.isBlank() && predictedExpiryDate.isNotBlank()) {
+                        predictedExpiryDate
+                    } else {
+                        expiryDateError = expiryDate.isBlank()
+                        expiryDate
+                    }
 
                     if (!nameError && !quantityError && !purchaseDateError && !expiryDateError) {
                         viewModel.createInventoryItem(
@@ -208,7 +403,7 @@ fun AddItemScreen(
                             category = category,
                             quantity = quantity.toDouble(),
                             purchaseDate = purchaseDate.trim(),
-                            expiryDate = expiryDate.trim()
+                            expiryDate = finalExpiryDate
                         )
                     }
                 },

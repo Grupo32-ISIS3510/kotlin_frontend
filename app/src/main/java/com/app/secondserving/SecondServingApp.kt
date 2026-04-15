@@ -2,7 +2,10 @@ package com.app.secondserving
 
 import android.app.Application
 import android.util.Log
+import com.app.secondserving.data.ExpirationNotifier
+import com.app.secondserving.data.InventoryRepository
 import com.app.secondserving.data.SessionManager
+import com.app.secondserving.data.local.AppDatabase
 import com.app.secondserving.data.network.RetrofitClient
 import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.CoroutineScope
@@ -14,9 +17,22 @@ class SecondServingApp : Application() {
     lateinit var sessionManager: SessionManager
         private set
 
+    lateinit var database: AppDatabase
+        private set
+
+    lateinit var inventoryRepository: InventoryRepository
+        private set
+
+    lateinit var expirationNotifier: ExpirationNotifier
+        private set
+
     override fun onCreate() {
         super.onCreate()
         sessionManager = SessionManager(this)
+        database = AppDatabase.getDatabase(this)
+        inventoryRepository = InventoryRepository(database)
+        expirationNotifier = ExpirationNotifier(this, inventoryRepository)
+        expirationNotifier.startObserving()
         RetrofitClient.init(sessionManager)
         registerFcmTokenIfLoggedIn()
     }
