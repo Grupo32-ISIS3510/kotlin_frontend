@@ -10,9 +10,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.net.UnknownHostException
 import java.time.LocalDate
 import java.time.format.DateTimeParseException
 import java.time.temporal.ChronoUnit
+import java.util.concurrent.TimeoutException
 
 enum class Urgency { RED, YELLOW, GREEN }
 
@@ -49,9 +51,44 @@ class InventoryViewModel(private val repository: InventoryRepository) : ViewMode
     private val _selectedCategory = MutableStateFlow("Todos")
     val selectedCategory: StateFlow<String> = _selectedCategory.asStateFlow()
 
-    private var allItems: List<InventoryItemUi> = emptyList()
+    private val _allItems = MutableStateFlow<List<InventoryItemUi>>(emptyList())
     private val _addItemState = MutableStateFlow<AddItemUiState>(AddItemUiState.Idle)
     val addItemState: StateFlow<AddItemUiState> = _addItemState.asStateFlow()
+
+    /**
+     * Transforms a raw exception into a user-friendly message.
+     * Unwraps IOException cause chain since InventoryServiceAdapter
+     * wraps all exceptions, hiding the original type.
+     */
+    private fun getUserFriendlyMessage(exception: Throwable): String {
+        val rootCause = unwrapCause(exception)
+        return when (rootCause) {
+            is UnknownHostException -> "No hay conexión a internet. Verifica tu red e intenta de nuevo."
+            is java.net.SocketTimeoutException -> "La conexión tardó demasiado. Verifica tu red e intenta de nuevo."
+            is TimeoutException -> "La conexión tardó demasiado. Verifica tu red e intenta de nuevo."
+            is java.net.ConnectException -> "No se pudo conectar al servidor. Intenta de nuevo más tarde."
+            else -> {
+                val msg = rootCause.message
+                if (msg.isNullOrBlank() || msg.contains("HTTP") || msg.contains("Exception") || msg.contains("Error")) {
+                    "Ocurrió un error inesperado. Intenta de nuevo más tarde."
+                } else {
+                    msg
+                }
+            }
+        }
+    }
+
+    /**
+     * Walks the exception cause chain to find the root cause.
+     * Needed because InventoryServiceAdapter wraps everything in IOException.
+     */
+    private fun unwrapCause(throwable: Throwable): Throwable {
+        var current: Throwable = throwable
+        while (current.cause != null && current.cause !== current) {
+            current = current.cause!!
+        }
+        return current
+    }
 
     fun loadInventory() {
         viewModelScope.launch {
@@ -59,9 +96,9 @@ class InventoryViewModel(private val repository: InventoryRepository) : ViewMode
             when (val result = repository.getInventory()) {
                 is Result.Success -> {
                     val today = LocalDate.now()
-                    allItems = result.data.map { item ->
+                    _allItems.value = result.data.map { item ->
                         val daysRemaining = try {
-                            val expiry = LocalDate.parse(item.expiry_date)
+                            val expiry = LocalDate.parse(item.expiryDate)
                             ChronoUnit.DAYS.between(today, expiry)
                         } catch (e: DateTimeParseException) {
                             0L
@@ -83,9 +120,7 @@ class InventoryViewModel(private val repository: InventoryRepository) : ViewMode
                     applyFilters()
                 }
                 is Result.Error -> {
-                    _uiState.value = InventoryUiState.Error(
-                        result.exception.message ?: "Error desconocido"
-                    )
+                    _uiState.value = InventoryUiState.Error(getUserFriendlyMessage(result.exception))
                 }
             }
         }
@@ -104,7 +139,8 @@ class InventoryViewModel(private val repository: InventoryRepository) : ViewMode
     private fun applyFilters() {
         val query = _searchQuery.value.trim().lowercase()
         val category = _selectedCategory.value
-        val filtered = allItems.filter { item ->
+        val items = _allItems.value
+        val filtered = items.filter { item ->
             val matchesSearch = query.isEmpty() || item.name.lowercase().contains(query)
             val matchesCategory = category == "Todos" || item.category.equals(category, ignoreCase = true)
             matchesSearch && matchesCategory
@@ -134,9 +170,7 @@ class InventoryViewModel(private val repository: InventoryRepository) : ViewMode
                     loadInventory()
                 }
                 is Result.Error -> {
-                    _addItemState.value = AddItemUiState.Error(
-                        result.exception.message ?: "Error desconocido"
-                    )
+                    _addItemState.value = AddItemUiState.Error(getUserFriendlyMessage(result.exception))
                 }
             }
         }

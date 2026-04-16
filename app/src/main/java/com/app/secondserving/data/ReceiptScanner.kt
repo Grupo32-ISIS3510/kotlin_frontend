@@ -121,7 +121,7 @@ class ReceiptScanner(private val context: Context) {
                 // Ignorar líneas muy cortas o muy largas
                 if (trimmed.length in 3..50 &&
                     !trimmed.contains(Regex("\\d{2}[/\\-]\\d{2}[/\\-]\\d{2}")) &&
-                    !trimmed.contains(Regex("(TOTAL|SUBTOTAL|IMPUESTO|IVA|FACTURA)"))
+                    !trimmed.contains(Regex("\\b(total|subtotal|impuesto|iva|factura)\\b", RegexOption.IGNORE_CASE))
                 ) {
                     // Podría ser un nombre de producto
                     val priceMatch = pricePattern.find(trimmed)
@@ -153,7 +153,7 @@ class ReceiptScanner(private val context: Context) {
 
         // Buscar total
         for (line in lines.reversed().take(10)) {
-            if (line.contains(Regex("(TOTAL|Total|total)"), RegexOption.IGNORE_CASE)) {
+            if (line.contains(Regex("\\btotal\\b", RegexOption.IGNORE_CASE))) {
                 val priceMatch = pricePattern.find(line)
                 if (priceMatch != null) {
                     totalAmount = priceMatch.groupValues[1].replace(",", ".").toDoubleOrNull()

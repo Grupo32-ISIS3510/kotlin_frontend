@@ -17,9 +17,20 @@ import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CameraAlt
@@ -41,6 +52,8 @@ import androidx.core.content.ContextCompat
 import com.app.secondserving.data.ReceiptScanResult
 import com.app.secondserving.data.ReceiptScanner
 import com.app.secondserving.data.ScannedItem
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
@@ -70,6 +83,7 @@ fun ScanReceiptScreen(
     }
 
     var showGalleryPicker by remember { mutableStateOf(false) }
+    var imageToProcess by remember { mutableStateOf<Uri?>(null) }
     var isProcessing by remember { mutableStateOf(false) }
     var scanResult by remember { mutableStateOf<ReceiptScanResult?>(null) }
     var showConfirmDialog by remember { mutableStateOf(false) }
@@ -80,10 +94,31 @@ fun ScanReceiptScreen(
     val galleryLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
-        uri?.let { processImage(context, scanner, it, onItemsScanned) { result ->
-            scanResult = result
-            showConfirmDialog = true
-        }}
+        uri?.let { 
+            imageToProcess = it
+            showConfirmDialog = false // Reset dialog state
+        }
+    }
+
+    // Process image when imageToProcess changes
+    LaunchedEffect(imageToProcess) {
+        imageToProcess?.let { uri ->
+            isProcessing = true
+            try {
+                val result = scanner.scanReceipt(uri)
+                scanResult = result
+                showConfirmDialog = true
+            } catch (e: Exception) {
+                Toast.makeText(
+                    context,
+                    "Error procesando imagen: ${e.message}",
+                    Toast.LENGTH_LONG
+                ).show()
+            } finally {
+                isProcessing = false
+                imageToProcess = null
+            }
+        }
     }
 
     // Launcher para permiso de cámara
@@ -131,10 +166,8 @@ fun ScanReceiptScreen(
                 CameraPreview(
                     modifier = Modifier.fillMaxSize(),
                     onImageCaptured = { uri ->
-                        processImage(context, scanner, uri, onItemsScanned) { result ->
-                            scanResult = result
-                            showConfirmDialog = true
-                        }
+                        imageToProcess = uri
+                        showConfirmDialog = false
                     }
                 )
             } else {
@@ -283,22 +316,11 @@ private fun CameraPreview(
 
     var imageCapture by remember { mutableStateOf<ImageCapture?>(null) }
     var lensFacing by remember { mutableStateOf(CameraSelector.LENS_FACING_BACK) }
+    var previewView by remember { mutableStateOf<PreviewView?>(null) }
 
     LaunchedEffect(Unit) {
         val cameraProvider = cameraProviderFuture.get()
-        val preview = Preview.Builder().build().also {
-            it.setSurfaceProvider(
-                AndroidView(
-                    factory = { ctx ->
-                        PreviewView(ctx).apply {
-                            scaleType = PreviewView.ScaleType.FILL_CENTER
-                        }
-                    },
-                    modifier = modifier
-                ).findViewById<PreviewView>(android.R.id.content)?.surfaceProvider
-                    ?: it.surfaceProvider
-            )
-        }
+        val preview = Preview.Builder().build()
 
         imageCapture = ImageCapture.Builder()
             .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
@@ -321,33 +343,44 @@ private fun CameraPreview(
         }
     }
 
-    // Botón para capturar (se maneja desde el padre)
-    LaunchedEffect(imageCapture) {
-        // El botón de capturar está en el padre
-    }
+    AndroidView(
+        factory = { ctx ->
+            PreviewView(ctx).apply {
+                scaleType = PreviewView.ScaleType.FILL_CENTER
+            }.also { previewView = it }
+        },
+        update = { view ->
+            val cameraProvider = cameraProviderFuture.get()
+            val preview = Preview.Builder().build().also {
+                it.setSurfaceProvider(view.surfaceProvider)
+            }
+            // Camera already bound in LaunchedEffect
+        },
+        modifier = modifier
+    )
 }
 
-private fun processImage(
+private suspend fun processImage(
     context: Context,
     scanner: ReceiptScanner,
     uri: Uri,
     onItemsScanned: (List<ScannedItem>, String?) -> Unit,
     onResult: (ReceiptScanResult) -> Unit
 ) {
-    kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
-        try {
-            val result = scanner.scanReceipt(uri)
-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                onResult(result)
-            }
-        } catch (e: Exception) {
-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                Toast.makeText(
-                    context,
-                    "Error procesando imagen: ${e.message}",
-                    Toast.LENGTH_LONG
-                ).show()
-            }
+    try {
+        val result = withContext(Dispatchers.IO) {
+            scanner.scanReceipt(uri)
+        }
+        withContext(Dispatchers.Main) {
+            onResult(result)
+        }
+    } catch (e: Exception) {
+        withContext(Dispatchers.Main) {
+            Toast.makeText(
+                context,
+                "Error procesando imagen: ${e.message}",
+                Toast.LENGTH_LONG
+            ).show()
         }
     }
 }

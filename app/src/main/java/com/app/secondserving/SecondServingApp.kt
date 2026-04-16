@@ -10,9 +10,13 @@ import com.app.secondserving.data.network.RetrofitClient
 import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
 class SecondServingApp : Application() {
+
+    private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     lateinit var sessionManager: SessionManager
         private set
@@ -37,9 +41,14 @@ class SecondServingApp : Application() {
         registerFcmTokenIfLoggedIn()
     }
 
+    override fun onTerminate() {
+        super.onTerminate()
+        applicationScope.cancel()
+    }
+
     fun registerFcmToken(token: String) {
         val savedToken = sessionManager.getToken() ?: return
-        CoroutineScope(Dispatchers.IO).launch {
+        applicationScope.launch {
             try {
                 RetrofitClient.authInstance.registerFcmToken(
                     mapOf("token" to token, "device_type" to "android")

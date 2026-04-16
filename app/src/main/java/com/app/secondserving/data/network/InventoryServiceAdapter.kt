@@ -21,9 +21,13 @@ class InventoryServiceAdapter(
     suspend fun getInventory(): Result<List<FoodItemEntity>> {
         return try {
             val response = apiService.getInventory()
-            if (response.isSuccessful && response.body() != null) {
-                val items = response.body()!!.items.map { it.toEntity() }
-                Result.Success(items)
+            if (response.isSuccessful) {
+                val items = response.body()?.items?.map { it.toEntity() }
+                if (items != null) {
+                    Result.Success(items)
+                } else {
+                    Result.Error(IOException("Empty response body from server"))
+                }
             } else {
                 Result.Error(
                     IOException(
@@ -43,8 +47,13 @@ class InventoryServiceAdapter(
     suspend fun createInventoryItem(request: InventoryItemRequest): Result<FoodItemEntity> {
         return try {
             val response = apiService.createInventoryItem(request)
-            if (response.isSuccessful && response.body() != null) {
-                Result.Success(response.body()!!.toEntity())
+            if (response.isSuccessful) {
+                val item = response.body()?.toEntity()
+                if (item != null) {
+                    Result.Success(item)
+                } else {
+                    Result.Error(IOException("Empty response body from server"))
+                }
             } else {
                 Result.Error(
                     IOException("Error creating item: ${response.code()} ${response.message()}")
@@ -61,8 +70,14 @@ class InventoryServiceAdapter(
     suspend fun deleteInventoryItem(itemId: String): Result<Unit> {
         return try {
             // Nota: El backend debe implementar DELETE /inventory/{id}
-            // Por ahora simulamos éxito
-            Result.Success(Unit)
+            val response = apiService.deleteInventoryItem(itemId)
+            if (response.isSuccessful) {
+                Result.Success(Unit)
+            } else {
+                Result.Error(
+                    IOException("Error deleting item: ${response.code()} ${response.message()}")
+                )
+            }
         } catch (e: Exception) {
             Result.Error(IOException("Error deleting item", e))
         }
@@ -74,8 +89,26 @@ class InventoryServiceAdapter(
     suspend fun updateInventoryItem(item: FoodItemEntity): Result<FoodItemEntity> {
         return try {
             // Nota: El backend debe implementar PUT /inventory/{id}
-            // Por ahora simulamos éxito
-            Result.Success(item)
+            val request = InventoryItemRequest(
+                name = item.name,
+                category = item.category,
+                quantity = item.quantity.toDouble(),
+                purchase_date = item.purchaseDate,
+                expiry_date = item.expiryDate
+            )
+            val response = apiService.updateInventoryItem(item.id, request)
+            if (response.isSuccessful) {
+                val updated = response.body()?.toEntity()
+                if (updated != null) {
+                    Result.Success(updated)
+                } else {
+                    Result.Error(IOException("Empty response body from server"))
+                }
+            } else {
+                Result.Error(
+                    IOException("Error updating item: ${response.code()} ${response.message()}")
+                )
+            }
         } catch (e: Exception) {
             Result.Error(IOException("Error updating item", e))
         }

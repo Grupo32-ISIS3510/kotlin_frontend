@@ -180,7 +180,7 @@ object ShelfLifePredictor {
         
         if (totalDays <= 0) return 0
         
-        return ((totalDays - elapsedDays).toDouble() / totalDays * 100).coerceIn(0, 100).toInt()
+        return ((totalDays - elapsedDays).toDouble() / totalDays.toDouble() * 100.0).coerceIn(0.0, 100.0).toInt()
     }
 
     /**

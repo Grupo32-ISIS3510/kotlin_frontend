@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -17,6 +18,7 @@ import com.app.secondserving.data.local.FoodItemEntity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collectLatest
@@ -59,12 +61,19 @@ class ExpirationNotifier(private val context: Context, private val repository: I
 
     /**
      * Inicia el observador que monitorea los items que expiran pronto.
-     * Se ejecuta en segundo plano usando coroutines.
+     * Idempotente: si ya está observando, no inicia otro.
      */
     fun startObserving() {
+        // Evitar scopes huérfanos si se llama dos veces
+        if (observerJob?.isActive == true) return
+
+        stopObserving() // Cancela cualquier scope previo que haya fallado
+
         createNotificationChannel()
 
-        observerJob = CoroutineScope(Dispatchers.IO).launch {
+        val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
+        observerJob = scope.launch {
             repository.getExpiringSoonItems().collectLatest { items ->
                 items.forEach { item ->
                     val daysRemaining = calculateDaysRemaining(item.expiryDate)
@@ -101,8 +110,8 @@ class ExpirationNotifier(private val context: Context, private val repository: I
         }
 
         val title = when {
-            daysRemaining == 0 -> "¡${item.name} vence hoy!"
-            daysRemaining == 1 -> "¡${item.name} vence mañana!"
+            daysRemaining == 0L -> "¡${item.name} vence hoy!"
+            daysRemaining == 1L -> "¡${item.name} vence mañana!"
             else -> "${item.name} vence en $daysRemaining días"
         }
 
@@ -123,8 +132,8 @@ class ExpirationNotifier(private val context: Context, private val repository: I
 
         // Color según urgencia
         val color = when {
-            daysRemaining <= 1 -> 0xFFFF0000.toInt() // Rojo
-            daysRemaining <= 3 -> 0xFFFFA500.toInt() // Naranja
+            daysRemaining <= 1L -> 0xFFFF0000.toInt() // Rojo
+            daysRemaining <= 3L -> 0xFFFFA500.toInt() // Naranja
             else -> 0xFFFFFF00.toInt() // Amarillo
         }
 
@@ -155,7 +164,8 @@ class ExpirationNotifier(private val context: Context, private val repository: I
             val today = LocalDate.now()
             ChronoUnit.DAYS.between(today, expiry)
         } catch (e: Exception) {
-            0L
+            Log.w("ExpirationNotifier", "Fecha de expiración inválida: $expiryDate", e)
+            Long.MAX_VALUE // Tratamos fecha inválida como "nunca expira" para no notificar falsos positivos
         }
     }
 

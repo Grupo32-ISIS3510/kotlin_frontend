@@ -1,0 +1,2574 @@
+diff --git a/app/src/main/java/com/app/secondserving/MainActivity.kt b/app/src/main/java/com/app/secondserving/MainActivity.kt
+index 12d45d9..1759e2e 100644
+--- a/app/src/main/java/com/app/secondserving/MainActivity.kt
++++ b/app/src/main/java/com/app/secondserving/MainActivity.kt
+@@ -7,16 +7,31 @@ import androidx.activity.compose.rememberLauncherForActivityResult
+ import androidx.activity.compose.setContent
+ import androidx.activity.enableEdgeToEdge
+ import androidx.activity.result.contract.ActivityResultContracts
++import androidx.compose.foundation.layout.Arrangement
+ import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.Column
++import androidx.compose.foundation.layout.Row
+ import androidx.compose.foundation.layout.fillMaxSize
++import androidx.compose.foundation.layout.fillMaxWidth
+ import androidx.compose.foundation.layout.padding
++import androidx.compose.foundation.layout.size
++import androidx.compose.foundation.layout.WindowInsets
++import androidx.compose.foundation.layout.navigationBars
++import androidx.compose.foundation.layout.windowInsetsPadding
++import androidx.compose.foundation.shape.CircleShape
++import androidx.compose.material3.FloatingActionButton
++import androidx.compose.material3.Icon
++import androidx.compose.material3.IconButton
++import androidx.compose.material3.MaterialTheme
++import androidx.compose.material3.Scaffold
++import androidx.compose.material3.Surface
++import androidx.compose.material3.Text
+ import androidx.compose.material.icons.Icons
++import androidx.compose.material.icons.automirrored.filled.List
++import androidx.compose.material.icons.automirrored.filled.MenuBook
+ import androidx.compose.material.icons.filled.AccountCircle
+ import androidx.compose.material.icons.filled.Add
+ import androidx.compose.material.icons.filled.Home
+-import androidx.compose.material.icons.filled.List
+-import androidx.compose.material.icons.filled.MenuBook
+-import androidx.compose.material.icons.filled.QrCodeScanner
+ import androidx.compose.material3.*
+ import androidx.compose.runtime.*
+ import androidx.compose.runtime.saveable.rememberSaveable
+@@ -24,6 +39,8 @@ import androidx.compose.ui.Alignment
+ import androidx.compose.ui.Modifier
+ import androidx.compose.ui.graphics.Color
+ import androidx.compose.ui.graphics.vector.ImageVector
++import androidx.compose.ui.unit.sp
++import androidx.compose.ui.unit.dp
+ import androidx.lifecycle.viewmodel.compose.viewModel
+ import com.app.secondserving.data.InventoryRepository
+ import com.app.secondserving.data.ScannedItem
+@@ -33,6 +50,7 @@ import com.app.secondserving.ui.inventory.InventoryScreen
+ import com.app.secondserving.ui.inventory.InventoryViewModel
+ import com.app.secondserving.ui.inventory.InventoryViewModelFactory
+ import com.app.secondserving.ui.inventory.ItemDetailScreen
++import com.app.secondserving.ui.inventory.ReviewScannedItemsScreen
+ import com.app.secondserving.ui.inventory.ScanReceiptScreen
+ import com.app.secondserving.ui.inventory.WeatherViewModel
+ import com.app.secondserving.ui.theme.MyApplicationTheme
+@@ -51,16 +69,20 @@ class MainActivity : ComponentActivity() {
+ 
+ enum class AppDestinations(val label: String, val icon: ImageVector) {
+     INICIO("Inicio", Icons.Default.Home),
+-    DESPENSA("Despensa", Icons.Default.List),
+-    RECETAS("Recetas", Icons.Default.MenuBook),
++    DESPENSA("Despensa", Icons.AutoMirrored.Filled.List),
++    RECETAS("Recetas", Icons.AutoMirrored.Filled.MenuBook),
+     PERFIL("Perfil", Icons.Default.AccountCircle),
+ }
+ 
+ @Composable
+ fun MyApplicationApp() {
+     var currentDestination by rememberSaveable { mutableStateOf(AppDestinations.DESPENSA) }
+-    var showAddItem by remember { mutableStateOf(false) }
+-    var showScanReceipt by remember { mutableStateOf(false) }
++    var showAddItem by rememberSaveable { mutableStateOf(false) }
++    var showScanFromAdd by rememberSaveable { mutableStateOf(false) }
++    var showReviewItems by rememberSaveable { mutableStateOf(false) }
++    // Data kept in regular remember - will reset on rotation but navigation state is preserved
++    var scannedItems by remember { mutableStateOf<List<ScannedItem>?>(null) }
++    var scannedPurchaseDate by remember { mutableStateOf<String?>(null) }
+     var selectedItem by remember { mutableStateOf<InventoryItemUi?>(null) }
+     var selectedItemTip by remember { mutableStateOf("") }
+     // Pedir permiso de notificaciones (Android 13+)
+@@ -88,32 +110,86 @@ fun MyApplicationApp() {
+         )
+     )
+ 
+-    // Pantalla de escanear factura
+-    if (showScanReceipt) {
++    // Flujo de escaneo desde AddItemScreen: Escanear → Revisión → Guardar
++    if (showScanFromAdd) {
++        androidx.activity.compose.BackHandler {
++            showScanFromAdd = false
++            showAddItem = true
++        }
+         ScanReceiptScreen(
+-            onItemsScanned = { items, purchaseDate ->
+-                // Aquí se podrían agregar los items escaneados al inventario
+-                showScanReceipt = false
+-                showAddItem = true // Ir a pantalla de agregar para confirmar
++            onItemsScanned = { items, date ->
++                scannedItems = items
++                scannedPurchaseDate = date
++                showScanFromAdd = false
++                showReviewItems = true
++            },
++            onNavigateBack = {
++                showScanFromAdd = false
++                showAddItem = true
++            }
++        )
++        return
++    }
++
++    if (showReviewItems && scannedItems != null) {
++        androidx.activity.compose.BackHandler {
++            showReviewItems = false
++            scannedItems = null
++            scannedPurchaseDate = null
++            showScanFromAdd = true
++        }
++        ReviewScannedItemsScreen(
++            scannedItems = scannedItems!!,
++            purchaseDate = scannedPurchaseDate,
++            onSaveItems = { items, date ->
++                inventoryViewModel.createInventoryItemsBulk(
++                    items.map { editable ->
++                        ScannedItem(
++                            name = editable.name,
++                            price = editable.price,
++                            category = editable.category
++                        )
++                    },
++                    date
++                )
++                showReviewItems = false
++                scannedItems = null
++                scannedPurchaseDate = null
++                showAddItem = false
+             },
+-            onNavigateBack = { showScanReceipt = false }
++            onNavigateBack = {
++                showReviewItems = false
++                scannedItems = null
++                scannedPurchaseDate = null
++                showScanFromAdd = true
++            }
+         )
+         return
++    } else if (showReviewItems && scannedItems == null) {
++        // Data lost on rotation, go back
++        showReviewItems = false
+     }
+ 
+     if (showAddItem) {
++        androidx.activity.compose.BackHandler {
++            showAddItem = false
++        }
+         AddItemScreen(
+             viewModel = inventoryViewModel,
+             onNavigateBack = { showAddItem = false },
+             onOpenScanner = {
+                 showAddItem = false
+-                showScanReceipt = true
++                showScanFromAdd = true
+             }
+         )
+         return
+     }
+ 
+     if (selectedItem != null) {
++        androidx.activity.compose.BackHandler {
++            selectedItem = null
++            selectedItemTip = ""
++        }
+         val weatherVm: WeatherViewModel = viewModel()
+         ItemDetailScreen(
+             item = selectedItem!!,
+@@ -124,70 +200,82 @@ fun MyApplicationApp() {
+         return
+     }
+ 
++    val green = Color(0xFF386641)
++
+     Scaffold(
+         modifier = Modifier.fillMaxSize(),
+         bottomBar = {
+-            NavigationBar(containerColor = Color.White) {
+-                AppDestinations.entries.forEachIndexed { index, destination ->
+-                    if (index == 2) {
+-                        NavigationBarItem(
+-                            selected = false,
+-                            onClick = {},
+-                            icon = {},
+-                            enabled = false
+-                        )
+-                    }
+-                    NavigationBarItem(
+-                        selected = currentDestination == destination,
+-                        onClick = { currentDestination = destination },
+-                        icon = {
+-                            Icon(destination.icon, contentDescription = destination.label)
+-                        },
+-                        label = { Text(destination.label) },
+-                        colors = NavigationBarItemDefaults.colors(
+-                            selectedIconColor = Color(0xFF386641),
+-                            selectedTextColor = Color(0xFF386641),
+-                            indicatorColor = Color(0x1A386641)
+-                        )
+-                    )
+-                }
+-            }
+-        },
+-        floatingActionButton = {
+-            Row(
+-                horizontalArrangement = Arrangement.spacedBy(8.dp)
++            Surface(
++                modifier = Modifier
++                    .fillMaxWidth()
++                    .windowInsetsPadding(WindowInsets.navigationBars),
++                color = Color.White,
++                shadowElevation = 8.dp
+             ) {
+-                // Botón de escanear
+-                FloatingActionButton(
+-                    onClick = {
+-                        inventoryViewModel.resetAddItemState()
+-                        showScanReceipt = true
+-                    },
+-                    containerColor = Color(0xFFFF6F00),
+-                    contentColor = Color.White,
+-                    modifier = Modifier.size(56.dp)
++                Row(
++                    modifier = Modifier
++                        .fillMaxWidth()
++                        .padding(top = 2.dp, bottom = 4.dp),
++                    horizontalArrangement = Arrangement.Center,
++                    verticalAlignment = Alignment.CenterVertically
+                 ) {
+-                    Icon(
+-                        androidx.compose.material.icons.filled.QrCodeScanner,
+-                        contentDescription = "Escanear factura"
++                    NavItem(
++                        label = "Inicio",
++                        icon = Icons.Default.Home,
++                        selected = currentDestination == AppDestinations.INICIO,
++                        onClick = { currentDestination = AppDestinations.INICIO },
++                        modifier = Modifier.weight(1f)
++                    )
++                    NavItem(
++                        label = "Despensa",
++                        icon = Icons.AutoMirrored.Filled.List,
++                        selected = currentDestination == AppDestinations.DESPENSA,
++                        onClick = { currentDestination = AppDestinations.DESPENSA },
++                        modifier = Modifier.weight(1f)
++                    )
++                    Box(
++                        modifier = Modifier.weight(1.2f),
++                        contentAlignment = Alignment.Center
++                    ) {
++                        FloatingActionButton(
++                            onClick = {
++                                inventoryViewModel.resetAddItemState()
++                                showAddItem = true
++                            },
++                            containerColor = green,
++                            contentColor = Color.White,
++                            shape = CircleShape
++                        ) {
++                            Icon(
++                                imageVector = Icons.Default.Add,
++                                contentDescription = "Agregar producto",
++                                modifier = Modifier.size(28.dp)
++                            )
++                        }
++                    }
++                    NavItem(
++                        label = "Recetas",
++                        icon = Icons.AutoMirrored.Filled.MenuBook,
++                        selected = currentDestination == AppDestinations.RECETAS,
++                        onClick = { currentDestination = AppDestinations.RECETAS },
++                        modifier = Modifier.weight(1f)
++                    )
++                    NavItem(
++                        label = "Perfil",
++                        icon = Icons.Default.AccountCircle,
++                        selected = currentDestination == AppDestinations.PERFIL,
++                        onClick = { currentDestination = AppDestinations.PERFIL },
++                        modifier = Modifier.weight(1f)
+                     )
+-                }
+-                // Botón de agregar manual
+-                FloatingActionButton(
+-                    onClick = {
+-                        inventoryViewModel.resetAddItemState()
+-                        showAddItem = true
+-                    },
+-                    containerColor = Color(0xFF386641),
+-                    contentColor = Color.White
+-                ) {
+-                    Icon(Icons.Default.Add, contentDescription = "Agregar producto")
+                 }
+             }
+-        },
+-        floatingActionButtonPosition = FabPosition.Center
++        }
+     ) { innerPadding ->
+-        Box(modifier = Modifier.padding(innerPadding)) {
++        Box(
++            modifier = Modifier
++                .fillMaxSize()
++                .padding(innerPadding)
++        ) {
+             when (currentDestination) {
+                 AppDestinations.DESPENSA -> InventoryScreen(
+                     viewModel = inventoryViewModel,
+@@ -209,4 +297,36 @@ private fun PlaceholderScreen(name: String) {
+     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+         Text(text = name, style = MaterialTheme.typography.headlineMedium, color = Color.Gray)
+     }
+-}
+\ No newline at end of file
++}
++
++@Composable
++private fun NavItem(
++    label: String,
++    icon: ImageVector,
++    selected: Boolean,
++    onClick: () -> Unit,
++    modifier: Modifier = Modifier
++) {
++    val green = Color(0xFF386641)
++    Column(
++        horizontalAlignment = Alignment.CenterHorizontally,
++        modifier = modifier,
++        verticalArrangement = Arrangement.spacedBy(0.dp)
++    ) {
++        IconButton(onClick = onClick, modifier = Modifier.size(36.dp)) {
++            Icon(
++                icon,
++                contentDescription = label,
++                tint = if (selected) green else Color.Gray,
++                modifier = Modifier.size(22.dp)
++            )
++        }
++        Text(
++            label,
++            fontSize = 10.sp,
++            lineHeight = 12.sp,
++            maxLines = 1,
++            color = if (selected) green else Color.Gray
++        )
++    }
++}
+diff --git a/app/src/main/java/com/app/secondserving/SecondServingApp.kt b/app/src/main/java/com/app/secondserving/SecondServingApp.kt
+index d6937ea..e507130 100644
+--- a/app/src/main/java/com/app/secondserving/SecondServingApp.kt
++++ b/app/src/main/java/com/app/secondserving/SecondServingApp.kt
+@@ -7,7 +7,6 @@ import com.app.secondserving.data.InventoryRepository
+ import com.app.secondserving.data.SessionManager
+ import com.app.secondserving.data.local.AppDatabase
+ import com.app.secondserving.data.network.RetrofitClient
+-import com.google.firebase.messaging.FirebaseMessaging
+ import kotlinx.coroutines.CoroutineScope
+ import kotlinx.coroutines.Dispatchers
+ import kotlinx.coroutines.launch
+@@ -28,33 +27,32 @@ class SecondServingApp : Application() {
+ 
+     override fun onCreate() {
+         super.onCreate()
++
++        // 1. LO PRIMERO: Configurar la red. Sin esto nada funciona.
+         sessionManager = SessionManager(this)
++        RetrofitClient.init(sessionManager)
++
++        // 2. LO SEGUNDO: Base de datos y Repositorio.
+         database = AppDatabase.getDatabase(this)
+         inventoryRepository = InventoryRepository(database)
++
++        // 3. LO TERCERO: Servicios secundarios.
+         expirationNotifier = ExpirationNotifier(this, inventoryRepository)
+         expirationNotifier.startObserving()
+-        RetrofitClient.init(sessionManager)
+-        registerFcmTokenIfLoggedIn()
+     }
+ 
+     fun registerFcmToken(token: String) {
+-        val savedToken = sessionManager.getToken() ?: return
+         CoroutineScope(Dispatchers.IO).launch {
+             try {
+-                RetrofitClient.authInstance.registerFcmToken(
+-                    mapOf("token" to token, "device_type" to "android")
+-                )
+-                Log.d("FCM", "Token registrado en backend")
++                val response = RetrofitClient.authInstance.registerFcmToken(mapOf("token" to token))
++                if (response.isSuccessful) {
++                    Log.d("FCM", "Token registrado correctamente")
++                } else {
++                    Log.e("FCM", "Error registrando token: ${response.code()}")
++                }
+             } catch (e: Exception) {
+                 Log.e("FCM", "Error registrando token", e)
+             }
+         }
+     }
+-
+-    private fun registerFcmTokenIfLoggedIn() {
+-        if (sessionManager.getToken() == null) return
+-        FirebaseMessaging.getInstance().token.addOnSuccessListener { token ->
+-            registerFcmToken(token)
+-        }
+-    }
+-}
+\ No newline at end of file
++}
+diff --git a/app/src/main/java/com/app/secondserving/data/ExpirationNotifier.kt b/app/src/main/java/com/app/secondserving/data/ExpirationNotifier.kt
+index e15b1c6..337cf5e 100644
+--- a/app/src/main/java/com/app/secondserving/data/ExpirationNotifier.kt
++++ b/app/src/main/java/com/app/secondserving/data/ExpirationNotifier.kt
+@@ -14,65 +14,74 @@ import androidx.core.content.ContextCompat
+ import com.app.secondserving.MainActivity
+ import com.app.secondserving.R
+ import com.app.secondserving.data.local.FoodItemEntity
+-import kotlinx.coroutines.CoroutineScope
+-import kotlinx.coroutines.Dispatchers
+-import kotlinx.coroutines.Job
+-import kotlinx.coroutines.delay
+-import kotlinx.coroutines.flow.Flow
+-import kotlinx.coroutines.flow.collectLatest
+-import kotlinx.coroutines.launch
++import kotlinx.coroutines.*
++import kotlinx.coroutines.flow.first
+ import java.time.LocalDate
++import java.time.format.DateTimeFormatter
+ import java.time.temporal.ChronoUnit
+ 
+-/**
+- * Observer Pattern - Notificador de expiración de alimentos.
+- * Patrón Observer:
+- * - Observa cambios en los items del inventario
+- * - Notifica cuando un alimento está por expirar
+- * - Usa notificaciones locales de Android
+- */
+-class ExpirationNotifier(private val context: Context, private val repository: InventoryRepository) {
+-
+-    companion object {
+-        private const val CHANNEL_ID = "expiration_alerts"
+-        private const val CHANNEL_NAME = "Alertas de Expiración"
+-        private const val NOTIFICATION_DELAY_MS = 5000L // 5 segundos entre notificaciones
+-    }
+-
++class ExpirationNotifier(
++    private val context: Context,
++    private val repository: InventoryRepository
++) {
++    private val notificationManager = NotificationManagerCompat.from(context)
++    private val CHANNEL_ID = "expiration_notifications"
+     private var observerJob: Job? = null
++    private val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
+ 
+-    /**
+-     * Crea el canal de notificaciones (requerido Android 8+).
+-     */
+-    fun createNotificationChannel() {
++    init {
++        createNotificationChannel()
++    }
++
++    private fun createNotificationChannel() {
+         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+-            val importance = NotificationManager.IMPORTANCE_HIGH
+-            val channel = NotificationChannel(CHANNEL_ID, CHANNEL_NAME, importance).apply {
+-                description = "Notificaciones cuando los alimentos están por expirar"
+-                enableVibration(true)
+-                setShowBadge(true)
++            val name = "Notificaciones de Expiración"
++            val descriptionText = "Avisos sobre productos próximos a vencer"
++            val importance = NotificationManager.IMPORTANCE_DEFAULT
++            val channel = NotificationChannel(CHANNEL_ID, name, importance).apply {
++                description = descriptionText
+             }
+-            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
++            val notificationManager: NotificationManager =
++                context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+             notificationManager.createNotificationChannel(channel)
+         }
+     }
+ 
+     /**
+-     * Inicia el observador que monitorea los items que expiran pronto.
+-     * Se ejecuta en segundo plano usando coroutines.
++     * Inicia un observador que revisa diariamente los productos.
+      */
+     fun startObserving() {
+-        createNotificationChannel()
++        if (observerJob != null) return
+ 
+         observerJob = CoroutineScope(Dispatchers.IO).launch {
+-            repository.getExpiringSoonItems().collectLatest { items ->
+-                items.forEach { item ->
+-                    val daysRemaining = calculateDaysRemaining(item.expiryDate)
+-                    if (daysRemaining >= 0 && daysRemaining <= 3) {
++            while (isActive) {
++                checkExpirations()
++                // Esperar 24 horas antes de la siguiente revisión
++                delay(24 * 60 * 60 * 1000)
++            }
++        }
++    }
++
++    /**
++     * Revisa la base de datos y envía notificaciones para productos por vencer.
++     */
++    suspend fun checkExpirations() {
++        val items = repository.getInventoryFlow().first()
++        val today = LocalDate.now()
++
++        items.forEach { item ->
++            try {
++                if (item.expiryDate.isNotBlank()) {
++                    val expirationDate = LocalDate.parse(item.expiryDate, dateFormatter)
++                    val daysRemaining = ChronoUnit.DAYS.between(today, expirationDate)
++
++                    // Notificar si vence hoy, mañana o en 3 días
++                    if (daysRemaining in 0L..3L) {
+                         sendExpirationNotification(item, daysRemaining)
+-                        delay(NOTIFICATION_DELAY_MS)
+                     }
+                 }
++            } catch (e: Exception) {
++                // Ignorar items con fecha inválida
+             }
+         }
+     }
+@@ -101,8 +110,8 @@ class ExpirationNotifier(private val context: Context, private val repository: I
+         }
+ 
+         val title = when {
+-            daysRemaining == 0 -> "¡${item.name} vence hoy!"
+-            daysRemaining == 1 -> "¡${item.name} vence mañana!"
++            daysRemaining == 0L -> "¡${item.name} vence hoy!"
++            daysRemaining == 1L -> "¡${item.name} vence mañana!"
+             else -> "${item.name} vence en $daysRemaining días"
+         }
+ 
+@@ -114,59 +123,25 @@ class ExpirationNotifier(private val context: Context, private val repository: I
+             putExtra("expiring_item_id", item.id)
+         }
+ 
+-        val pendingIntent = PendingIntent.getActivity(
++        val pendingIntent: PendingIntent = PendingIntent.getActivity(
+             context,
+             item.id.hashCode(),
+             intent,
+-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
++            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+         )
+ 
+-        // Color según urgencia
+-        val color = when {
+-            daysRemaining <= 1 -> 0xFFFF0000.toInt() // Rojo
+-            daysRemaining <= 3 -> 0xFFFFA500.toInt() // Naranja
+-            else -> 0xFFFFFF00.toInt() // Amarillo
+-        }
+-
+-        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+-            .setSmallIcon(android.R.drawable.ic_dialog_alert)
++        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
++            .setSmallIcon(R.drawable.ic_launcher_foreground) // Asegúrate de tener un icono
+             .setContentTitle(title)
+             .setContentText(message)
+-            .setPriority(NotificationCompat.PRIORITY_HIGH)
+-            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+-            .setColor(color)
+-            .setAutoCancel(true)
++            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+             .setContentIntent(pendingIntent)
+-            .build()
+-
+-        // Enviar notificación
+-        NotificationManagerCompat.from(context).notify(
+-            item.id.hashCode(),
+-            notification
+-        )
+-    }
+-
+-    /**
+-     * Calcula días restantes hasta la expiración.
+-     */
+-    private fun calculateDaysRemaining(expiryDate: String): Long {
+-        return try {
+-            val expiry = LocalDate.parse(expiryDate)
+-            val today = LocalDate.now()
+-            ChronoUnit.DAYS.between(today, expiry)
+-        } catch (e: Exception) {
+-            0L
+-        }
+-    }
++            .setAutoCancel(true)
+ 
+-    /**
+-     * Envía una notificación inmediata para un item específico.
+-     * Útil cuando el usuario agrega un item que ya está cerca de expirar.
+-     */
+-    fun notifyImmediateExpiration(item: FoodItemEntity) {
+-        val daysRemaining = calculateDaysRemaining(item.expiryDate)
+-        if (daysRemaining >= 0 && daysRemaining <= 3) {
+-            sendExpirationNotification(item, daysRemaining)
++        try {
++            notificationManager.notify(item.id.hashCode(), builder.build())
++        } catch (e: SecurityException) {
++            // Manejar excepción de falta de permisos si ocurre
+         }
+     }
+ }
+diff --git a/app/src/main/java/com/app/secondserving/data/ReceiptScanner.kt b/app/src/main/java/com/app/secondserving/data/ReceiptScanner.kt
+index 1c22866..2b507b5 100644
+--- a/app/src/main/java/com/app/secondserving/data/ReceiptScanner.kt
++++ b/app/src/main/java/com/app/secondserving/data/ReceiptScanner.kt
+@@ -2,6 +2,7 @@ package com.app.secondserving.data
+ 
+ import android.content.Context
+ import android.graphics.Bitmap
++import android.graphics.Color
+ import android.net.Uri
+ import android.util.Log
+ import com.google.mlkit.vision.common.InputImage
+@@ -16,6 +17,11 @@ import java.time.format.DateTimeFormatter
+  * Scanner OCR para extraer información de facturas/tickets.
+  * Feature (a): Sensor — Cámara para escanear alimentos.
+  * 
++ * Usa preprocesamiento de imagen para mejorar nitidez:
++ * - Escala de grises
++ * - Ecualización de histograma (contraste)
++ * - Umbral binario adaptativo
++ *
+  * Extrae:
+  * - Nombres de productos
+  * - Fechas de compra
+@@ -29,12 +35,13 @@ class ReceiptScanner(private val context: Context) {
+     private val dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
+ 
+     /**
+-     * Procesa una imagen (URI) y extrae texto usando OCR.
++     * Procesa una imagen (URI) y extrae texto usando OCR con preprocesamiento.
+      */
+     suspend fun scanReceipt(imageUri: Uri): ReceiptScanResult {
+         return try {
+             val bitmap = MediaUtils.bitmapFromUri(context, imageUri)
+-            processBitmap(bitmap)
++            val preprocessedBitmap = preprocessBitmap(bitmap)
++            processBitmap(preprocessedBitmap)
+         } catch (e: Exception) {
+             Log.e("ReceiptScanner", "Error scanning receipt", e)
+             ReceiptScanResult(error = "Error procesando la imagen: ${e.message}")
+@@ -42,17 +49,99 @@ class ReceiptScanner(private val context: Context) {
+     }
+ 
+     /**
+-     * Procesa un Bitmap y extrae texto usando OCR.
++     * Procesa un Bitmap y extrae texto usando OCR con preprocesamiento.
+      */
+     suspend fun scanReceipt(bitmap: Bitmap): ReceiptScanResult {
+         return try {
+-            processBitmap(bitmap)
++            val preprocessedBitmap = preprocessBitmap(bitmap)
++            processBitmap(preprocessedBitmap)
+         } catch (e: Exception) {
+             Log.e("ReceiptScanner", "Error scanning receipt", e)
+             ReceiptScanResult(error = "Error procesando la imagen: ${e.message}")
+         }
+     }
+ 
++    /**
++     * Preprocesa el bitmap para mejorar la calidad del OCR.
++     * - Escala a resolución óptima
++     * - Convierte a escala de grises
++     * - Aumenta contraste con ecualización de histograma
++     * - Aplica umbral binario para texto
++     */
++    private fun preprocessBitmap(bitmap: Bitmap): Bitmap {
++        // 1. Escalar a resolución óptima para OCR (ancho máximo 1280px)
++        val maxWidth = 1280
++        val scale = if (bitmap.width > maxWidth) maxWidth.toFloat() / bitmap.width else 1f
++        
++        if (scale >= 1f && bitmap.config == Bitmap.Config.ARGB_8888) {
++            // Ya está en buena resolución, aplicar solo filtros
++            return applyImageEnhancement(bitmap)
++        }
++        
++        val scaledWidth = (bitmap.width * scale).toInt()
++        val scaledHeight = (bitmap.height * scale).toInt()
++        
++        val scaledBitmap = Bitmap.createScaledBitmap(bitmap, scaledWidth, scaledHeight, true)
++        return applyImageEnhancement(scaledBitmap)
++    }
++
++    /**
++     * Aplica mejoras a la imagen: escala de grises, contraste y umbral.
++     */
++    private fun applyImageEnhancement(bitmap: Bitmap): Bitmap {
++        val width = bitmap.width
++        val height = bitmap.height
++        val enhancedBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
++        
++        val pixels = IntArray(width * height)
++        bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
++        
++        // Calcular histograma para ecualización
++        val histogram = IntArray(256)
++        
++        // 1. Convertir a escala de grises y calcular histograma
++        for (i in pixels.indices) {
++            val pixel = pixels[i]
++            val r = Color.red(pixel)
++            val g = Color.green(pixel)
++            val b = Color.blue(pixel)
++            
++            // Fórmula de luminosidad para escala de grises
++            val gray = (0.299 * r + 0.587 * g + 0.114 * b).toInt().coerceIn(0, 255)
++            histogram[gray]++
++            
++            pixels[i] = Color.rgb(gray, gray, gray)
++        }
++        
++        // 2. Ecualización de histograma (mejora contraste)
++        val cdf = IntArray(256)
++        cdf[0] = histogram[0]
++        for (i in 1 until 256) {
++            cdf[i] = cdf[i - 1] + histogram[i]
++        }
++        
++        val cdfMin = cdf.first { it > 0 }
++        val totalPixels = width * height
++        
++        val lookupTable = IntArray(256)
++        for (i in 0 until 256) {
++            lookupTable[i] = ((cdf[i] - cdfMin) * 255 / (totalPixels - cdfMin)).coerceIn(0, 255)
++        }
++        
++        // 3. Umbral binario suave para texto (mejora OCR)
++        for (i in pixels.indices) {
++            val gray = Color.red(pixels[i])
++            val enhanced = lookupTable[gray]
++            
++            // Umbral: pixeles oscuros -> negro (texto), claros -> blanco (fondo)
++            val threshold = if (enhanced < 180) 0 else 255
++            pixels[i] = Color.rgb(threshold, threshold, threshold)
++        }
++        
++        enhancedBitmap.setPixels(pixels, 0, width, 0, 0, width, height)
++        return enhancedBitmap
++    }
++
+     /**
+      * Procesa el bitmap con ML Kit.
+      */
+@@ -153,7 +242,9 @@ class ReceiptScanner(private val context: Context) {
+ 
+         // Buscar total
+         for (line in lines.reversed().take(10)) {
+-            if (line.contains(Regex("(TOTAL|Total|total)"), RegexOption.IGNORE_CASE)) {
++            if (line.contains("TOTAL", ignoreCase = true) || 
++                line.contains("Total", ignoreCase = true) || 
++                line.contains("total", ignoreCase = true)) {
+                 val priceMatch = pricePattern.find(line)
+                 if (priceMatch != null) {
+                     totalAmount = priceMatch.groupValues[1].replace(",", ".").toDoubleOrNull()
+diff --git a/app/src/main/java/com/app/secondserving/data/ShelfLifePredictor.kt b/app/src/main/java/com/app/secondserving/data/ShelfLifePredictor.kt
+index f590e4a..7fe6b4b 100644
+--- a/app/src/main/java/com/app/secondserving/data/ShelfLifePredictor.kt
++++ b/app/src/main/java/com/app/secondserving/data/ShelfLifePredictor.kt
+@@ -125,8 +125,8 @@ object ShelfLifePredictor {
+         category: String,
+         storageType: String = "ambiente"
+     ): LocalDate {
+-        val shelfLifeDays = predictShelfLifeDays(category, storageType)
+-        return purchaseDate.plusDays(shelfLifeDays.toLong())
++        val shelfLifeDaysValue = predictShelfLifeDays(category, storageType)
++        return purchaseDate.plusDays(shelfLifeDaysValue.toLong())
+     }
+ 
+     /**
+@@ -180,7 +180,7 @@ object ShelfLifePredictor {
+         
+         if (totalDays <= 0) return 0
+         
+-        return ((totalDays - elapsedDays).toDouble() / totalDays * 100).coerceIn(0, 100).toInt()
++        return ((totalDays - elapsedDays).toDouble() / totalDays * 100.0).coerceIn(0.0, 100.0).toInt()
+     }
+ 
+     /**
+@@ -212,14 +212,14 @@ object ShelfLifePredictor {
+      */
+     fun enrichWithShelfLifePrediction(item: FoodItemEntity): FoodItemEntity {
+         // Si ya tiene fecha de expiración, no hacer nada
+-        if (item.expiryDate.isNotBlank() && item.expiryDate != "") {
++        if (item.expiryDate.isNotBlank()) {
+             return item
+         }
+         
+         // Predecir fecha de expiración
+         val storageType = getStorageRecommendation(item.category)
+         val predictedExpiry = predictExpiryDate(
+-            purchaseDateStr = item.purchaseDate.ifBlank { LocalDate.now().toString() },
++            purchaseDateStr = if (item.purchaseDate.isBlank()) LocalDate.now().toString() else item.purchaseDate,
+             category = item.category,
+             storageType = storageType
+         )
+diff --git a/app/src/main/java/com/app/secondserving/data/network/InventoryServiceAdapter.kt b/app/src/main/java/com/app/secondserving/data/network/InventoryServiceAdapter.kt
+index ef42936..1cf4eaa 100644
+--- a/app/src/main/java/com/app/secondserving/data/network/InventoryServiceAdapter.kt
++++ b/app/src/main/java/com/app/secondserving/data/network/InventoryServiceAdapter.kt
+@@ -4,20 +4,13 @@ import com.app.secondserving.data.local.FoodItemEntity
+ import com.app.secondserving.data.Result
+ import java.io.IOException
+ 
+-/**
+- * Service Adapter / Web Service Broker.
+- * Patrón: Encapsula el acceso a servicios remotos (Retrofit).
+- * - Maneja errores, timeouts, autenticación
+- * - Mapea DTOs del servicio a modelos de dominio
+- */
+-class InventoryServiceAdapter(
+-    private val apiService: ApiService = RetrofitClient.authInstance
+-) {
++class InventoryServiceAdapter {
++
++    // Cambiamos a un getter para que solo pida la instancia cuando REALMENTE la necesite
++    // y no cuando se crea el objeto. Esto evita el crash de lateinit.
++    private val apiService: ApiService
++        get() = RetrofitClient.authInstance
+ 
+-    /**
+-     * Obtiene inventario desde el backend.
+-     * @return Result con lista de FoodItemEntity o Error
+-     */
+     suspend fun getInventory(): Result<List<FoodItemEntity>> {
+         return try {
+             val response = apiService.getInventory()
+@@ -25,89 +18,45 @@ class InventoryServiceAdapter(
+                 val items = response.body()!!.items.map { it.toEntity() }
+                 Result.Success(items)
+             } else {
+-                Result.Error(
+-                    IOException(
+-                        "Error fetching inventory: ${response.code()} ${response.message()}"
+-                    )
+-                )
++                Result.Error(IOException("Error fetching: ${response.code()}"))
+             }
+         } catch (e: Exception) {
+-            Result.Error(IOException("Error fetching inventory", e))
++            Result.Error(IOException("Error fetching", e))
+         }
+     }
+ 
+-    /**
+-     * Crea un nuevo item en el backend.
+-     * @return Result con el item creado o Error
+-     */
+     suspend fun createInventoryItem(request: InventoryItemRequest): Result<FoodItemEntity> {
+         return try {
+             val response = apiService.createInventoryItem(request)
+             if (response.isSuccessful && response.body() != null) {
+                 Result.Success(response.body()!!.toEntity())
+             } else {
+-                Result.Error(
+-                    IOException("Error creating item: ${response.code()} ${response.message()}")
+-                )
++                Result.Error(IOException("Error creating: ${response.code()}"))
+             }
+         } catch (e: Exception) {
+-            Result.Error(IOException("Error creating item", e))
++            Result.Error(IOException("Error creating", e))
+         }
+     }
+ 
+-    /**
+-     * Elimina un item del backend.
+-     */
+     suspend fun deleteInventoryItem(itemId: String): Result<Unit> {
+-        return try {
+-            // Nota: El backend debe implementar DELETE /inventory/{id}
+-            // Por ahora simulamos éxito
+-            Result.Success(Unit)
+-        } catch (e: Exception) {
+-            Result.Error(IOException("Error deleting item", e))
+-        }
++        return Result.Success(Unit)
+     }
+ 
+-    /**
+-     * Actualiza un item en el backend.
+-     */
+     suspend fun updateInventoryItem(item: FoodItemEntity): Result<FoodItemEntity> {
+-        return try {
+-            // Nota: El backend debe implementar PUT /inventory/{id}
+-            // Por ahora simulamos éxito
+-            Result.Success(item)
+-        } catch (e: Exception) {
+-            Result.Error(IOException("Error updating item", e))
+-        }
++        return Result.Success(item)
+     }
+ }
+ 
+-/**
+- * Extensión para mapear DTO del backend a entidad Room.
+- */
+ private fun InventoryItem.toEntity(): FoodItemEntity {
+     return FoodItemEntity(
+         id = this.id,
+         name = this.name,
+         category = this.category,
+         quantity = this.quantity,
+-        purchaseDate = "", // El backend no devuelve purchase_date en la respuesta
++        purchaseDate = "", 
+         expiryDate = this.expiry_date,
+         originalShelfLifeDays = null,
+         createdAt = System.currentTimeMillis(),
+         updatedAt = System.currentTimeMillis()
+     )
+ }
+-
+-/**
+- * Extensión para mapear entidad Room a DTO del backend.
+- */
+-fun FoodItemEntity.toRequest(): InventoryItemRequest {
+-    return InventoryItemRequest(
+-        name = this.name,
+-        category = this.category,
+-        quantity = this.quantity.toDouble(),
+-        purchase_date = this.purchaseDate,
+-        expiry_date = this.expiryDate
+-    )
+-}
+diff --git a/app/src/main/java/com/app/secondserving/data/network/RetrofitClient.kt b/app/src/main/java/com/app/secondserving/data/network/RetrofitClient.kt
+index 4645280..b3e8303 100644
+--- a/app/src/main/java/com/app/secondserving/data/network/RetrofitClient.kt
++++ b/app/src/main/java/com/app/secondserving/data/network/RetrofitClient.kt
+@@ -8,8 +8,9 @@ import retrofit2.converter.gson.GsonConverterFactory
+ 
+ object RetrofitClient {
+ 
+-    // 10.0.2.2 accede al localhost de la PC desde el emulador Android
+-    private const val BASE_URL = "http://10.0.2.2:8000/api/v1/"
++    // localhost con adb reverse funciona para emulador y dispositivo físico
++    // adb reverse tcp:8000 tcp:8000
++    private const val BASE_URL = "http://localhost:8000/api/v1/"
+ 
+     private val logging = HttpLoggingInterceptor().apply {
+         level = HttpLoggingInterceptor.Level.BODY
+diff --git a/app/src/main/java/com/app/secondserving/ui/inventory/AddItemScreen.kt b/app/src/main/java/com/app/secondserving/ui/inventory/AddItemScreen.kt
+index e76b888..ed5b40a 100644
+--- a/app/src/main/java/com/app/secondserving/ui/inventory/AddItemScreen.kt
++++ b/app/src/main/java/com/app/secondserving/ui/inventory/AddItemScreen.kt
+@@ -1,26 +1,39 @@
+ package com.app.secondserving.ui.inventory
+ 
++import android.Manifest
++import android.net.Uri
++import android.widget.Toast
++import androidx.activity.compose.rememberLauncherForActivityResult
++import androidx.activity.result.contract.ActivityResultContracts
+ import androidx.compose.foundation.background
++import androidx.compose.foundation.border
++import androidx.compose.foundation.clickable
+ import androidx.compose.foundation.layout.*
+ import androidx.compose.foundation.rememberScrollState
+ import androidx.compose.foundation.shape.RoundedCornerShape
+ import androidx.compose.foundation.text.KeyboardOptions
+ import androidx.compose.foundation.verticalScroll
+ import androidx.compose.material.icons.Icons
+-import androidx.compose.material.icons.filled.ArrowBack
++import androidx.compose.material.icons.automirrored.filled.ArrowBack
+ import androidx.compose.material.icons.filled.CalendarToday
++import androidx.compose.material.icons.filled.ChevronRight
+ import androidx.compose.material.icons.filled.QrCodeScanner
+ import androidx.compose.material3.*
+ import androidx.compose.runtime.*
+ import androidx.compose.ui.Alignment
+ import androidx.compose.ui.Modifier
+ import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.platform.LocalContext
+ import androidx.compose.ui.text.font.FontWeight
+ import androidx.compose.ui.text.input.KeyboardType
+ import androidx.compose.ui.unit.dp
+ import androidx.compose.ui.unit.sp
+ import androidx.compose.ui.window.Dialog
++import androidx.core.content.FileProvider
++import com.app.secondserving.data.ReceiptScanner
+ import com.app.secondserving.data.ShelfLifePredictor
++import kotlinx.coroutines.launch
++import java.io.File
+ import java.time.LocalDate
+ import java.time.format.DateTimeFormatter
+ 
+@@ -34,8 +47,10 @@ private val DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd")
+ fun AddItemScreen(
+     viewModel: InventoryViewModel,
+     onNavigateBack: () -> Unit,
+-    onOpenScanner: (() -> Unit)? = null
++    onOpenScanner: () -> Unit = {}
+ ) {
++    val context = LocalContext.current
++    val scope = rememberCoroutineScope()
+     val addItemState by viewModel.addItemState.collectAsState()
+ 
+     var name by remember { mutableStateOf("") }
+@@ -59,9 +74,119 @@ fun AddItemScreen(
+     var showPurchaseDatePicker by remember { mutableStateOf(false) }
+     var showExpiryDatePicker by remember { mutableStateOf(false) }
+ 
++    // Estado para escáner OCR
++    var isScanning by remember { mutableStateOf(false) }
++    var capturedImageUri by remember { mutableStateOf<Uri?>(null) }
++    val scanner = remember { ReceiptScanner(context) }
++
++    var hasCameraPermission by remember {
++        mutableStateOf(
++            androidx.core.content.ContextCompat.checkSelfPermission(
++                context,
++                Manifest.permission.CAMERA
++            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
++        )
++    }
++
++    // Launcher para cámara
++    val cameraLauncher = rememberLauncherForActivityResult(
++        ActivityResultContracts.TakePicture()
++    ) { success ->
++        if (success && capturedImageUri != null) {
++            isScanning = true
++            scope.launch {
++                try {
++                    val result = scanner.scanReceipt(capturedImageUri!!)
++                    if (result.error != null) {
++                        Toast.makeText(context, result.error, Toast.LENGTH_LONG).show()
++                    } else if (result.items.isNotEmpty()) {
++                        // Llenar campos con el primer producto detectado
++                        val firstItem = result.items.first()
++                        name = firstItem.name
++                        category = firstItem.category.ifBlank { "Otros" }
++                        quantity = "1"
++                        purchaseDate = result.purchaseDate ?: LocalDate.now().toString()
++                        predictedExpiryDate = ShelfLifePredictor.predictExpiryDate(
++                            purchaseDateStr = purchaseDate,
++                            category = category
++                        )
++                        storageTip = ShelfLifePredictor.getStorageRecommendation(category)
++                        showPredictionTip = true
++                        expiryDate = predictedExpiryDate
++                    } else {
++                        Toast.makeText(context, "No se detectaron productos en la imagen", Toast.LENGTH_LONG).show()
++                    }
++                } catch (e: Exception) {
++                    Toast.makeText(context, "Error al procesar: ${e.message}", Toast.LENGTH_LONG).show()
++                } finally {
++                    isScanning = false
++                }
++            }
++        }
++    }
++
++    // Launcher para galería
++    val galleryLauncher = rememberLauncherForActivityResult(
++        ActivityResultContracts.GetContent()
++    ) { uri: Uri? ->
++        uri?.let {
++            isScanning = true
++            scope.launch {
++                try {
++                    val result = scanner.scanReceipt(it)
++                    if (result.error != null) {
++                        Toast.makeText(context, result.error, Toast.LENGTH_LONG).show()
++                    } else if (result.items.isNotEmpty()) {
++                        val firstItem = result.items.first()
++                        name = firstItem.name
++                        category = firstItem.category.ifBlank { "Otros" }
++                        quantity = "1"
++                        purchaseDate = result.purchaseDate ?: LocalDate.now().toString()
++                        predictedExpiryDate = ShelfLifePredictor.predictExpiryDate(
++                            purchaseDateStr = purchaseDate,
++                            category = category
++                        )
++                        storageTip = ShelfLifePredictor.getStorageRecommendation(category)
++                        showPredictionTip = true
++                        expiryDate = predictedExpiryDate
++                    } else {
++                        Toast.makeText(context, "No se detectaron productos en la imagen", Toast.LENGTH_LONG).show()
++                    }
++                } catch (e: Exception) {
++                    Toast.makeText(context, "Error al procesar: ${e.message}", Toast.LENGTH_LONG).show()
++                } finally {
++                    isScanning = false
++                }
++            }
++        }
++    }
++
++    // Launcher para permiso de cámara
++    val permissionLauncher = rememberLauncherForActivityResult(
++        ActivityResultContracts.RequestPermission()
++    ) { isGranted ->
++        hasCameraPermission = isGranted
++        if (isGranted) {
++            // Abrir cámara directamente
++            val photoFile = File(context.cacheDir, "receipt_capture.jpg")
++            val photoUri = FileProvider.getUriForFile(
++                context,
++                "${context.packageName}.fileprovider",
++                photoFile
++            )
++            capturedImageUri = photoUri
++            cameraLauncher.launch(photoUri)
++        }
++    }
++
++    // Limpiar recursos del scanner al salir del composable
++    DisposableEffect(Unit) {
++        onDispose { scanner.close() }
++    }
++
+     // Actualizar predicción cuando cambia categoría o fecha de compra
+     LaunchedEffect(category, purchaseDate) {
+-        if (purchaseDate.isNotBlank() && expiryDate.isBlank()) {
++        if (purchaseDate.isNotBlank() && expiryDate.isBlank() && !isScanning) {
+             predictedExpiryDate = ShelfLifePredictor.predictExpiryDate(
+                 purchaseDateStr = purchaseDate,
+                 category = category
+@@ -85,33 +210,17 @@ fun AddItemScreen(
+                     Text(
+                         "Agregar alimento",
+                         fontWeight = FontWeight.Bold,
+-                        fontSize = 20.sp
++                        fontSize = 20.sp,
++                        color = GreenDark
+                     )
+                 },
+                 navigationIcon = {
+                     IconButton(onClick = onNavigateBack) {
+-                        Icon(Icons.Default.ArrowBack, contentDescription = "Volver")
+-                    }
+-                },
+-                actions = {
+-                    // Botón para escanear factura
+-                    if (onOpenScanner != null) {
+-                        IconButton(onClick = onOpenScanner) {
+-                            Column(
+-                                horizontalAlignment = Alignment.CenterHorizontally
+-                            ) {
+-                                Icon(
+-                                    Icons.Default.QrCodeScanner,
+-                                    contentDescription = "Escanear factura",
+-                                    tint = GreenDark
+-                                )
+-                                Text(
+-                                    text = "Escanear",
+-                                    fontSize = 10.sp,
+-                                    color = GreenDark
+-                                )
+-                            }
+-                        }
++                        Icon(
++                            Icons.AutoMirrored.Filled.ArrowBack,
++                            contentDescription = "Volver a la despensa",
++                            tint = GreenDark
++                        )
+                     }
+                 },
+                 colors = TopAppBarDefaults.topAppBarColors(
+@@ -131,6 +240,57 @@ fun AddItemScreen(
+         ) {
+             Spacer(modifier = Modifier.height(8.dp))
+ 
++            // Botón de escanear con cámara
++            Card(
++                onClick = onOpenScanner,
++                modifier = Modifier.fillMaxWidth(),
++                colors = CardDefaults.cardColors(containerColor = GreenDark),
++                elevation = CardDefaults.cardElevation(4.dp),
++                shape = RoundedCornerShape(16.dp)
++            ) {
++                Row(
++                    modifier = Modifier
++                        .fillMaxWidth()
++                        .padding(20.dp),
++                    horizontalArrangement = Arrangement.spacedBy(16.dp),
++                    verticalAlignment = Alignment.CenterVertically
++                ) {
++                    Icon(
++                        imageVector = Icons.Default.QrCodeScanner,
++                        contentDescription = null,
++                        tint = Color.White,
++                        modifier = Modifier.size(36.dp)
++                    )
++                    Column(
++                        modifier = Modifier.weight(1f),
++                        verticalArrangement = Arrangement.spacedBy(2.dp)
++                    ) {
++                        Text(
++                            text = "Escanear con cámara",
++                            fontWeight = FontWeight.Bold,
++                            fontSize = 16.sp,
++                            color = Color.White
++                        )
++                        Text(
++                            text = "Detecta productos automáticamente",
++                            fontSize = 13.sp,
++                            color = Color(0xFFE8F5E9)
++                        )
++                    }
++                }
++            }
++
++            // Divider
++            HorizontalDivider(color = Color(0xFFE0E0E0), thickness = 1.dp)
++
++            // Título del formulario
++            Text(
++                text = "Datos del producto",
++                fontWeight = FontWeight.Bold,
++                fontSize = 16.sp,
++                color = Color(0xFF333333)
++            )
++
+             // Nombre
+             OutlinedTextField(
+                 value = name,
+@@ -160,7 +320,7 @@ fun AddItemScreen(
+                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
+                     modifier = Modifier
+                         .fillMaxWidth()
+-                        .menuAnchor(),
++                        .menuAnchor(MenuAnchorType.PrimaryNotEditable, true),
+                     shape = RoundedCornerShape(12.dp),
+                     colors = OutlinedTextFieldDefaults.colors(
+                         focusedBorderColor = GreenDark,
+@@ -424,7 +584,8 @@ fun AddItemScreen(
+                     Text(
+                         "Guardar alimento",
+                         fontSize = 16.sp,
+-                        fontWeight = FontWeight.SemiBold
++                        fontWeight = FontWeight.SemiBold,
++                        color = Color.White
+                     )
+                 }
+             }
+diff --git a/app/src/main/java/com/app/secondserving/ui/inventory/InventoryViewModel.kt b/app/src/main/java/com/app/secondserving/ui/inventory/InventoryViewModel.kt
+index bfa476a..3e12205 100644
+--- a/app/src/main/java/com/app/secondserving/ui/inventory/InventoryViewModel.kt
++++ b/app/src/main/java/com/app/secondserving/ui/inventory/InventoryViewModel.kt
+@@ -5,6 +5,8 @@ import androidx.lifecycle.ViewModelProvider
+ import androidx.lifecycle.viewModelScope
+ import com.app.secondserving.data.InventoryRepository
+ import com.app.secondserving.data.Result
++import com.app.secondserving.data.ScannedItem
++import com.app.secondserving.data.ShelfLifePredictor
+ import com.app.secondserving.data.network.InventoryItemRequest
+ import kotlinx.coroutines.flow.MutableStateFlow
+ import kotlinx.coroutines.flow.StateFlow
+@@ -61,7 +63,7 @@ class InventoryViewModel(private val repository: InventoryRepository) : ViewMode
+                     val today = LocalDate.now()
+                     allItems = result.data.map { item ->
+                         val daysRemaining = try {
+-                            val expiry = LocalDate.parse(item.expiry_date)
++                            val expiry = LocalDate.parse(item.expiryDate)
+                             ChronoUnit.DAYS.between(today, expiry)
+                         } catch (e: DateTimeParseException) {
+                             0L
+@@ -145,6 +147,47 @@ class InventoryViewModel(private val repository: InventoryRepository) : ViewMode
+     fun resetAddItemState() {
+         _addItemState.value = AddItemUiState.Idle
+     }
++
++    fun createInventoryItemsBulk(
++        items: List<ScannedItem>,
++        purchaseDate: String?
++    ) {
++        viewModelScope.launch {
++            _addItemState.value = AddItemUiState.Loading
++            
++            val today = purchaseDate ?: LocalDate.now().format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE)
++            var successCount = 0
++            var errorCount = 0
++            
++            for (scannedItem in items) {
++                try {
++                    val request = InventoryItemRequest(
++                        name = scannedItem.name,
++                        category = scannedItem.category,
++                        quantity = 1.0,
++                        purchase_date = today,
++                        expiry_date = ShelfLifePredictor.predictExpiryDate(today, scannedItem.category)
++                    )
++                    when (repository.createInventoryItem(request)) {
++                        is Result.Success -> successCount++
++                        is Result.Error -> errorCount++
++                    }
++                } catch (e: Exception) {
++                    errorCount++
++                }
++            }
++            
++            if (errorCount == 0) {
++                _addItemState.value = AddItemUiState.Success
++                loadInventory()
++            } else if (successCount > 0) {
++                _addItemState.value = AddItemUiState.Success
++                loadInventory()
++            } else {
++                _addItemState.value = AddItemUiState.Error("No se pudieron agregar los productos")
++            }
++        }
++    }
+ }
+ 
+ class InventoryViewModelFactory(private val repository: InventoryRepository) : ViewModelProvider.Factory {
+diff --git a/app/src/main/java/com/app/secondserving/ui/inventory/ReviewScannedItemsScreen.kt b/app/src/main/java/com/app/secondserving/ui/inventory/ReviewScannedItemsScreen.kt
+new file mode 100644
+index 0000000..4052db0
+--- /dev/null
++++ b/app/src/main/java/com/app/secondserving/ui/inventory/ReviewScannedItemsScreen.kt
+@@ -0,0 +1,682 @@
++package com.app.secondserving.ui.inventory
++
++import androidx.activity.compose.BackHandler
++import androidx.compose.foundation.background
++import androidx.compose.foundation.border
++import androidx.compose.foundation.clickable
++import androidx.compose.foundation.layout.*
++import androidx.compose.foundation.lazy.LazyColumn
++import androidx.compose.foundation.lazy.items
++import androidx.compose.foundation.lazy.itemsIndexed
++import androidx.compose.foundation.shape.RoundedCornerShape
++import androidx.compose.foundation.text.KeyboardOptions
++import androidx.compose.material.icons.Icons
++import androidx.compose.material.icons.filled.*
++import androidx.compose.material3.*
++import androidx.compose.runtime.*
++import androidx.compose.runtime.mutableIntStateOf
++import androidx.compose.ui.Alignment
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.draw.clip
++import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.text.font.FontWeight
++import androidx.compose.ui.text.input.KeyboardType
++import androidx.compose.ui.unit.dp
++import androidx.compose.ui.unit.sp
++import androidx.compose.ui.window.Dialog
++import com.app.secondserving.data.ScannedItem
++import com.app.secondserving.data.ShelfLifePredictor
++import java.time.LocalDate
++import java.time.format.DateTimeFormatter
++
++private val GreenDark = Color(0xFF386641)
++private val BackgroundColor = Color(0xFFF5F5F0)
++private val DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd")
++
++/**
++ * Item editable para la pantalla de revisión.
++ */
++data class EditableScannedItem(
++    val id: Int,
++    var name: String,
++    var quantity: Double,
++    var price: Double?,
++    var category: String,
++    var expiryDate: String
++)
++
++@OptIn(ExperimentalMaterial3Api::class)
++@Composable
++fun ReviewScannedItemsScreen(
++    scannedItems: List<ScannedItem>,
++    purchaseDate: String?,
++    onSaveItems: (List<EditableScannedItem>, String?) -> Unit,
++    onNavigateBack: () -> Unit
++) {
++    val today = LocalDate.now()
++    var selectedPurchaseDate by remember {
++        mutableStateOf(purchaseDate ?: today.format(DATE_FORMAT))
++    }
++    var showPurchaseDatePicker by remember { mutableStateOf(false) }
++
++    var editableItems by remember(scannedItems) {
++        mutableStateOf(
++            scannedItems.mapIndexed { index, item ->
++                val predictedExpiry = ShelfLifePredictor.predictExpiryDate(
++                    selectedPurchaseDate,
++                    item.category
++                )
++                EditableScannedItem(
++                    id = index,
++                    name = item.name,
++                    quantity = 1.0,
++                    price = item.price,
++                    category = item.category,
++                    expiryDate = predictedExpiry
++                )
++            }
++        )
++    }
++
++    // Update expiry dates when purchase date changes
++    val currentDate = selectedPurchaseDate
++    LaunchedEffect(currentDate) {
++        editableItems = editableItems.map { item ->
++            val predictedExpiry = ShelfLifePredictor.predictExpiryDate(currentDate, item.category)
++            item.copy(expiryDate = predictedExpiry)
++        }
++    }
++
++    var showDeleteDialog by remember { mutableStateOf<Int?>(null) }
++    var showAddItemDialog by remember { mutableStateOf(false) }
++    var isSaving by remember { mutableStateOf(false) }
++
++    // Calculate total
++    val totalAmount = editableItems.sumOf { it.price ?: 0.0 }
++
++    Scaffold(
++        topBar = {
++            TopAppBar(
++                title = {
++                    Text(
++                        "Revisar Productos",
++                        fontWeight = FontWeight.Bold,
++                        fontSize = 20.sp
++                    )
++                },
++                navigationIcon = {
++                    IconButton(onClick = onNavigateBack) {
++                        Icon(Icons.Default.ArrowBack, contentDescription = "Volver")
++                    }
++                },
++                actions = {
++                    TextButton(
++                        onClick = {
++                            isSaving = true
++                            onSaveItems(editableItems, selectedPurchaseDate)
++                        },
++                        enabled = editableItems.isNotEmpty() && !isSaving
++                    ) {
++                        if (isSaving) {
++                            CircularProgressIndicator(
++                                modifier = Modifier.size(20.dp),
++                                color = Color.White,
++                                strokeWidth = 2.dp
++                            )
++                            Spacer(modifier = Modifier.width(8.dp))
++                        }
++                        Text("Guardar", color = Color.White)
++                    }
++                },
++                colors = TopAppBarDefaults.topAppBarColors(
++                    containerColor = GreenDark
++                )
++            )
++        },
++        containerColor = BackgroundColor,
++        floatingActionButton = {
++            FloatingActionButton(
++                onClick = { showAddItemDialog = true },
++                containerColor = GreenDark,
++                contentColor = Color.White
++            ) {
++                Icon(Icons.Default.Add, contentDescription = "Agregar producto")
++            }
++        }
++    ) { padding ->
++        Box(
++            modifier = Modifier
++                .fillMaxSize()
++                .padding(padding)
++        ) {
++            if (editableItems.isEmpty()) {
++                Column(
++                    modifier = Modifier.fillMaxSize(),
++                    horizontalAlignment = Alignment.CenterHorizontally,
++                    verticalArrangement = Arrangement.Center
++                ) {
++                    Icon(
++                        Icons.Default.ReceiptLong,
++                        contentDescription = null,
++                        modifier = Modifier.size(80.dp),
++                        tint = Color.Gray
++                    )
++                    Spacer(modifier = Modifier.height(16.dp))
++                    Text(
++                        "No hay productos para revisar",
++                        color = Color.Gray,
++                        fontSize = 16.sp
++                    )
++                    Spacer(modifier = Modifier.height(8.dp))
++                    Text(
++                        "Toca el botón + para agregar productos manualmente",
++                        color = Color.Gray,
++                        fontSize = 14.sp
++                    )
++                }
++            } else {
++                LazyColumn(
++                    modifier = Modifier.fillMaxSize(),
++                    contentPadding = PaddingValues(16.dp),
++                    verticalArrangement = Arrangement.spacedBy(12.dp)
++                ) {
++                    // Header with purchase date and summary
++                    item {
++                        Card(
++                            modifier = Modifier.fillMaxWidth(),
++                            colors = CardDefaults.cardColors(containerColor = Color(0xFFE8F5E9)),
++                            shape = RoundedCornerShape(12.dp)
++                        ) {
++                            Column(
++                                modifier = Modifier
++                                    .fillMaxWidth()
++                                    .padding(12.dp),
++                                verticalArrangement = Arrangement.spacedBy(8.dp)
++                            ) {
++                                Row(
++                                    modifier = Modifier.fillMaxWidth(),
++                                    horizontalArrangement = Arrangement.SpaceBetween,
++                                    verticalAlignment = Alignment.CenterVertically
++                                ) {
++                                    Row(verticalAlignment = Alignment.CenterVertically) {
++                                        Icon(
++                                            Icons.Default.CalendarToday,
++                                            contentDescription = null,
++                                            tint = GreenDark,
++                                            modifier = Modifier.size(20.dp)
++                                        )
++                                        Spacer(modifier = Modifier.width(8.dp))
++                                        Text(
++                                            text = "Fecha de compra:",
++                                            fontWeight = FontWeight.SemiBold,
++                                            fontSize = 14.sp,
++                                            color = GreenDark
++                                        )
++                                    }
++                                    TextButton(onClick = { showPurchaseDatePicker = true }) {
++                                        Text(
++                                            text = selectedPurchaseDate,
++                                            fontWeight = FontWeight.Bold,
++                                            fontSize = 14.sp,
++                                            color = GreenDark
++                                        )
++                                        Icon(
++                                            Icons.Default.Edit,
++                                            contentDescription = "Cambiar fecha",
++                                            tint = GreenDark,
++                                            modifier = Modifier.size(16.dp)
++                                        )
++                                    }
++                                }
++                                Row(
++                                    modifier = Modifier.fillMaxWidth(),
++                                    horizontalArrangement = Arrangement.SpaceBetween
++                                ) {
++                                    Text(
++                                        text = "${editableItems.size} producto${if (editableItems.size != 1) "s" else ""}",
++                                        fontSize = 13.sp,
++                                        color = Color(0xFF555555)
++                                    )
++                                    Text(
++                                        text = "Total: $${String.format("%.2f", totalAmount)}",
++                                        fontWeight = FontWeight.Bold,
++                                        fontSize = 14.sp,
++                                        color = GreenDark
++                                    )
++                                }
++                            }
++                        }
++                    }
++
++                    itemsIndexed(editableItems, key = { _, item -> item.id }) { index, item ->
++                        EditableItemCard(
++                            item = item,
++                            onNameChange = { newName ->
++                                editableItems = editableItems.map { 
++                                    if (it.id == item.id) it.copy(name = newName) else it 
++                                }
++                            },
++                            onQuantityChange = { newQty ->
++                                editableItems = editableItems.map { 
++                                    if (it.id == item.id) it.copy(quantity = newQty) else it 
++                                }
++                            },
++                            onPriceChange = { newPrice ->
++                                editableItems = editableItems.map { 
++                                    if (it.id == item.id) it.copy(price = newPrice) else it 
++                                }
++                            },
++                            onCategoryChange = { newCategory ->
++                                editableItems = editableItems.map { 
++                                    if (it.id == item.id) it.copy(category = newCategory) else it 
++                                }
++                            },
++                            onExpiryDateChange = { newDate ->
++                                editableItems = editableItems.map { 
++                                    if (it.id == item.id) it.copy(expiryDate = newDate) else it 
++                                }
++                            },
++                            onDeleteClick = { showDeleteDialog = item.id }
++                        )
++                    }
++
++                    item {
++                        // Total summary card
++                        Card(
++                            modifier = Modifier.fillMaxWidth(),
++                            colors = CardDefaults.cardColors(containerColor = Color.White),
++                            elevation = CardDefaults.cardElevation(4.dp)
++                        ) {
++                            Row(
++                                modifier = Modifier
++                                    .fillMaxWidth()
++                                    .padding(16.dp),
++                                horizontalArrangement = Arrangement.SpaceBetween,
++                                verticalAlignment = Alignment.CenterVertically
++                            ) {
++                                Text(
++                                    "Total estimado:",
++                                    fontWeight = FontWeight.Bold,
++                                    fontSize = 18.sp,
++                                    color = GreenDark
++                                )
++                                Text(
++                                    "$${String.format("%.2f", totalAmount)}",
++                                    fontWeight = FontWeight.Bold,
++                                    fontSize = 20.sp,
++                                    color = GreenDark
++                                )
++                            }
++                        }
++                        Spacer(modifier = Modifier.height(80.dp)) // Space for FAB
++                    }
++                }
++            }
++        }
++    }
++
++    // Purchase date picker dialog
++    if (showPurchaseDatePicker) {
++        var selectedYear by remember { mutableIntStateOf(today.year) }
++        var selectedMonth by remember { mutableIntStateOf(today.monthValue - 1) }
++        var selectedDay by remember { mutableIntStateOf(today.dayOfMonth) }
++
++        AlertDialog(
++            onDismissRequest = { showPurchaseDatePicker = false },
++            title = { Text("Fecha de compra") },
++            text = {
++                android.widget.DatePicker(
++                    androidx.compose.ui.platform.LocalContext.current
++                ).apply {
++                    updateDate(selectedYear, selectedMonth, selectedDay)
++                    setOnDateChangedListener { _, year, month, day ->
++                        selectedYear = year
++                        selectedMonth = month
++                        selectedDay = day
++                    }
++                }
++            },
++            confirmButton = {
++                TextButton(
++                    onClick = {
++                        selectedPurchaseDate = String.format("%04d-%02d-%02d", selectedYear, selectedMonth + 1, selectedDay)
++                        showPurchaseDatePicker = false
++                    }
++                ) {
++                    Text("OK")
++                }
++            },
++            dismissButton = {
++                TextButton(onClick = { showPurchaseDatePicker = false }) {
++                    Text("Cancelar")
++                }
++            }
++        )
++    }
++
++    // Delete confirmation dialog
++    showDeleteDialog?.let { itemId ->
++        AlertDialog(
++            onDismissRequest = { showDeleteDialog = null },
++            title = { Text("Eliminar producto") },
++            text = { Text("¿Estás seguro de eliminar este producto de la lista?") },
++            confirmButton = {
++                TextButton(
++                    onClick = {
++                        editableItems = editableItems.filter { it.id != itemId }
++                        showDeleteDialog = null
++                    },
++                    colors = ButtonDefaults.textButtonColors(contentColor = Color.Red)
++                ) {
++                    Text("Eliminar")
++                }
++            },
++            dismissButton = {
++                TextButton(onClick = { showDeleteDialog = null }) {
++                    Text("Cancelar")
++                }
++            }
++        )
++    }
++
++    // Add new item dialog
++    if (showAddItemDialog) {
++        AddItemDialog(
++            onDismiss = { showAddItemDialog = false },
++            onAddItem = { name, quantity, price, category, expiryDate ->
++                editableItems = editableItems + EditableScannedItem(
++                    id = (editableItems.maxOfOrNull { it.id } ?: -1) + 1,
++                    name = name,
++                    quantity = quantity,
++                    price = price,
++                    category = category,
++                    expiryDate = expiryDate
++                )
++                showAddItemDialog = false
++            }
++        )
++    }
++}
++
++@OptIn(ExperimentalMaterial3Api::class)
++@Composable
++private fun EditableItemCard(
++    item: EditableScannedItem,
++    onNameChange: (String) -> Unit,
++    onQuantityChange: (Double) -> Unit,
++    onPriceChange: (Double?) -> Unit,
++    onCategoryChange: (String) -> Unit,
++    onExpiryDateChange: (String) -> Unit,
++    onDeleteClick: () -> Unit
++) {
++    var nameExpanded by remember { mutableStateOf(false) }
++    var quantityExpanded by remember { mutableStateOf(false) }
++    var priceExpanded by remember { mutableStateOf(false) }
++    var categoryExpanded by remember { mutableStateOf(false) }
++    var expiryExpanded by remember { mutableStateOf(false) }
++
++    Card(
++        modifier = Modifier.fillMaxWidth(),
++        colors = CardDefaults.cardColors(containerColor = Color.White),
++        elevation = CardDefaults.cardElevation(2.dp)
++    ) {
++        Column(
++            modifier = Modifier
++                .fillMaxWidth()
++                .padding(16.dp),
++            verticalArrangement = Arrangement.spacedBy(12.dp)
++        ) {
++            // Header with name and delete button
++            Row(
++                modifier = Modifier.fillMaxWidth(),
++                horizontalArrangement = Arrangement.SpaceBetween,
++                verticalAlignment = Alignment.CenterVertically
++            ) {
++                Text(
++                    text = item.name.ifBlank { "Sin nombre" },
++                    fontWeight = FontWeight.SemiBold,
++                    fontSize = 16.sp,
++                    color = Color(0xFF333333),
++                    modifier = Modifier.weight(1f)
++                )
++                IconButton(onClick = onDeleteClick) {
++                    Icon(
++                        Icons.Default.Delete,
++                        contentDescription = "Eliminar",
++                        tint = Color.Red
++                    )
++                }
++            }
++
++            // Name field
++            OutlinedTextField(
++                value = item.name,
++                onValueChange = onNameChange,
++                label = { Text("Nombre del producto") },
++                modifier = Modifier.fillMaxWidth(),
++                singleLine = true,
++                colors = OutlinedTextFieldDefaults.colors(
++                    focusedBorderColor = GreenDark,
++                    focusedLabelColor = GreenDark
++                )
++            )
++
++            // Quantity and Price in a row (2 columns)
++            Row(
++                modifier = Modifier.fillMaxWidth(),
++                horizontalArrangement = Arrangement.spacedBy(12.dp)
++            ) {
++                // Quantity
++                OutlinedTextField(
++                    value = item.quantity.toString(),
++                    onValueChange = {
++                        it.toDoubleOrNull()?.let { qty -> onQuantityChange(qty) }
++                        if (it.isEmpty()) onQuantityChange(0.0)
++                    },
++                    label = { Text("Cantidad") },
++                    modifier = Modifier.weight(1f),
++                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
++                    singleLine = true,
++                    colors = OutlinedTextFieldDefaults.colors(
++                        focusedBorderColor = GreenDark,
++                        focusedLabelColor = GreenDark
++                    )
++                )
++
++                // Price
++                OutlinedTextField(
++                    value = if (item.price != null) item.price.toString() else "",
++                    onValueChange = {
++                        if (it.isEmpty()) onPriceChange(null)
++                        else it.toDoubleOrNull()?.let { price -> onPriceChange(price) }
++                    },
++                    label = { Text("Precio (opcional)") },
++                    modifier = Modifier.weight(1f),
++                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
++                    singleLine = true,
++                    colors = OutlinedTextFieldDefaults.colors(
++                        focusedBorderColor = GreenDark,
++                        focusedLabelColor = GreenDark
++                    )
++                )
++            }
++
++            // Category dropdown - full width
++            ExposedDropdownMenuBox(
++                expanded = categoryExpanded,
++                onExpandedChange = { categoryExpanded = it }
++            ) {
++                OutlinedTextField(
++                    value = item.category,
++                    onValueChange = {},
++                    readOnly = true,
++                    label = { Text("Categoría") },
++                    modifier = Modifier
++                        .fillMaxWidth()
++                        .menuAnchor(MenuAnchorType.PrimaryNotEditable, true),
++                    trailingIcon = {
++                        ExposedDropdownMenuDefaults.TrailingIcon(expanded = categoryExpanded)
++                    },
++                    colors = OutlinedTextFieldDefaults.colors(
++                        focusedBorderColor = GreenDark,
++                        focusedLabelColor = GreenDark
++                    )
++                )
++                ExposedDropdownMenu(
++                    expanded = categoryExpanded,
++                    onDismissRequest = { categoryExpanded = false }
++                ) {
++                    val categories = listOf(
++                        "Lácteos", "Carnes", "Pescados", "Frutas",
++                        "Verduras", "Granos", "Bebidas", "Condimentos",
++                        "Enlatados", "Otros"
++                    )
++                    categories.forEach { category ->
++                        DropdownMenuItem(
++                            text = { Text(category) },
++                            onClick = {
++                                onCategoryChange(category)
++                                categoryExpanded = false
++                            }
++                        )
++                    }
++                }
++            }
++
++            // Expiry date
++            OutlinedTextField(
++                value = item.expiryDate,
++                onValueChange = onExpiryDateChange,
++                label = { Text("Fecha de vencimiento (YYYY-MM-DD)") },
++                modifier = Modifier.fillMaxWidth(),
++                singleLine = true,
++                colors = OutlinedTextFieldDefaults.colors(
++                    focusedBorderColor = GreenDark,
++                    focusedLabelColor = GreenDark
++                )
++            )
++        }
++    }
++}
++
++@OptIn(ExperimentalMaterial3Api::class)
++@Composable
++private fun AddItemDialog(
++    onDismiss: () -> Unit,
++    onAddItem: (name: String, quantity: Double, price: Double?, category: String, expiryDate: String) -> Unit
++) {
++    var name by remember { mutableStateOf("") }
++    var quantity by remember { mutableStateOf("1") }
++    var price by remember { mutableStateOf("") }
++    var category by remember { mutableStateOf("Otros") }
++    var expiryDate by remember { mutableStateOf(LocalDate.now().plusDays(7).toString()) }
++    var categoryExpanded by remember { mutableStateOf(false) }
++
++    AlertDialog(
++        onDismissRequest = onDismiss,
++        title = { Text("Agregar producto manual") },
++        text = {
++            Column(
++                verticalArrangement = Arrangement.spacedBy(12.dp)
++            ) {
++                OutlinedTextField(
++                    value = name,
++                    onValueChange = { name = it },
++                    label = { Text("Nombre") },
++                    singleLine = true,
++                    modifier = Modifier.fillMaxWidth()
++                )
++                Row(
++                    horizontalArrangement = Arrangement.spacedBy(8.dp)
++                ) {
++                    OutlinedTextField(
++                        value = quantity,
++                        onValueChange = { quantity = it },
++                        label = { Text("Cantidad") },
++                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
++                        singleLine = true,
++                        modifier = Modifier.weight(1f)
++                    )
++                    OutlinedTextField(
++                        value = price,
++                        onValueChange = { price = it },
++                        label = { Text("Precio (opcional)") },
++                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
++                        singleLine = true,
++                        modifier = Modifier.weight(1f)
++                    )
++                }
++                ExposedDropdownMenuBox(
++                    expanded = categoryExpanded,
++                    onExpandedChange = { categoryExpanded = it }
++                ) {
++                    OutlinedTextField(
++                        value = category,
++                        onValueChange = {},
++                        readOnly = true,
++                        label = { Text("Categoría") },
++                        modifier = Modifier
++                            .fillMaxWidth()
++                            .menuAnchor(MenuAnchorType.PrimaryNotEditable, true),
++                        trailingIcon = {
++                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = categoryExpanded)
++                        }
++                    )
++                    ExposedDropdownMenu(
++                        expanded = categoryExpanded,
++                        onDismissRequest = { categoryExpanded = false }
++                    ) {
++                        val categories = listOf(
++                            "Lácteos", "Carnes", "Pescados", "Frutas",
++                            "Verduras", "Granos", "Bebidas", "Condimentos",
++                            "Enlatados", "Otros"
++                        )
++                        categories.forEach { cat ->
++                            DropdownMenuItem(
++                                text = { Text(cat) },
++                                onClick = {
++                                    category = cat
++                                    categoryExpanded = false
++                                }
++                            )
++                        }
++                    }
++                }
++                OutlinedTextField(
++                    value = expiryDate,
++                    onValueChange = { expiryDate = it },
++                    label = { Text("Fecha de vencimiento") },
++                    placeholder = { Text("YYYY-MM-DD") },
++                    singleLine = true,
++                    modifier = Modifier.fillMaxWidth()
++                )
++            }
++        },
++        confirmButton = {
++            TextButton(
++                onClick = {
++                    if (name.isNotBlank()) {
++                        onAddItem(
++                            name,
++                            quantity.toDoubleOrNull() ?: 1.0,
++                            price.toDoubleOrNull(),
++                            category,
++                            expiryDate
++                        )
++                    }
++                },
++                enabled = name.isNotBlank()
++            ) {
++                Text("Agregar")
++            }
++        },
++        dismissButton = {
++            TextButton(onClick = onDismiss) {
++                Text("Cancelar")
++            }
++        }
++    )
++
++    // Handle system back button
++    BackHandler(onBack = onDismiss)
++}
+diff --git a/app/src/main/java/com/app/secondserving/ui/inventory/ScanReceiptScreen.kt b/app/src/main/java/com/app/secondserving/ui/inventory/ScanReceiptScreen.kt
+index f93f994..3bb5def 100644
+--- a/app/src/main/java/com/app/secondserving/ui/inventory/ScanReceiptScreen.kt
++++ b/app/src/main/java/com/app/secondserving/ui/inventory/ScanReceiptScreen.kt
+@@ -1,29 +1,17 @@
+ package com.app.secondserving.ui.inventory
+ 
+ import android.Manifest
+-import android.content.Context
+ import android.content.pm.PackageManager
+-import android.graphics.Bitmap
+-import android.graphics.BitmapFactory
+ import android.net.Uri
+-import android.util.Log
+ import android.widget.Toast
++import androidx.activity.compose.BackHandler
+ import androidx.activity.compose.rememberLauncherForActivityResult
+ import androidx.activity.result.contract.ActivityResultContracts
+-import androidx.camera.core.CameraSelector
+-import androidx.camera.core.ImageCapture
+-import androidx.camera.core.ImageCaptureException
+-import androidx.camera.core.Preview
+-import androidx.camera.lifecycle.ProcessCameraProvider
+-import androidx.camera.view.PreviewView
+-import androidx.compose.foundation.background
+ import androidx.compose.foundation.layout.*
+ import androidx.compose.foundation.shape.CircleShape
+-import androidx.compose.foundation.shape.RoundedCornerShape
+ import androidx.compose.material.icons.Icons
+-import androidx.compose.material.icons.filled.ArrowBack
++import androidx.compose.material.icons.automirrored.filled.ArrowBack
+ import androidx.compose.material.icons.filled.CameraAlt
+-import androidx.compose.material.icons.filled.FlipCameraAndroid
+ import androidx.compose.material.icons.filled.PhotoLibrary
+ import androidx.compose.material3.*
+ import androidx.compose.runtime.*
+@@ -31,22 +19,15 @@ import androidx.compose.ui.Alignment
+ import androidx.compose.ui.Modifier
+ import androidx.compose.ui.graphics.Color
+ import androidx.compose.ui.platform.LocalContext
+-import androidx.compose.ui.platform.LocalLifecycleOwner
+ import androidx.compose.ui.text.font.FontWeight
+ import androidx.compose.ui.unit.dp
+ import androidx.compose.ui.unit.sp
+-import androidx.compose.ui.viewinterop.AndroidView
+-import androidx.compose.ui.window.Dialog
+ import androidx.core.content.ContextCompat
+-import com.app.secondserving.data.ReceiptScanResult
++import androidx.core.content.FileProvider
+ import com.app.secondserving.data.ReceiptScanner
+ import com.app.secondserving.data.ScannedItem
++import kotlinx.coroutines.launch
+ import java.io.File
+-import java.text.SimpleDateFormat
+-import java.util.*
+-import java.util.concurrent.Executor
+-import kotlin.coroutines.resume
+-import kotlin.coroutines.suspendCoroutine
+ 
+ private val GreenDark = Color(0xFF386641)
+ private val BackgroundColor = Color(0xFFF5F5F0)
+@@ -58,7 +39,8 @@ fun ScanReceiptScreen(
+     onNavigateBack: () -> Unit
+ ) {
+     val context = LocalContext.current
+-    val lifecycleOwner = LocalLifecycleOwner.current
++    val scope = rememberCoroutineScope()
++    val scanner = remember { ReceiptScanner(context) }
+ 
+     var hasCameraPermission by remember {
+         mutableStateOf(
+@@ -69,21 +51,47 @@ fun ScanReceiptScreen(
+         )
+     }
+ 
+-    var showGalleryPicker by remember { mutableStateOf(false) }
++    var showCamera by remember { mutableStateOf(false) }
++    var capturedImageUri by remember { mutableStateOf<Uri?>(null) }
+     var isProcessing by remember { mutableStateOf(false) }
+-    var scanResult by remember { mutableStateOf<ReceiptScanResult?>(null) }
+-    var showConfirmDialog by remember { mutableStateOf(false) }
+ 
+-    val scanner = remember { ReceiptScanner(context) }
++    // Función para procesar la imagen con OCR
++    val processImage: (Uri) -> Unit = { uri ->
++        scope.launch {
++            isProcessing = true
++            try {
++                val result = scanner.scanReceipt(uri)
++                if (result.error != null) {
++                    Toast.makeText(context, result.error, Toast.LENGTH_LONG).show()
++                } else if (result.items.isNotEmpty()) {
++                    onItemsScanned(result.items, result.purchaseDate)
++                } else {
++                    Toast.makeText(context, "No se detectaron productos en la imagen", Toast.LENGTH_LONG).show()
++                }
++            } catch (e: Exception) {
++                Toast.makeText(context, "Error al procesar: ${e.message}", Toast.LENGTH_LONG).show()
++            } finally {
++                isProcessing = false
++            }
++        }
++    }
++
++    // Launcher para cámara
++    val cameraLauncher = rememberLauncherForActivityResult(
++        ActivityResultContracts.TakePicture()
++    ) { success ->
++        if (success && capturedImageUri != null) {
++            processImage(capturedImageUri!!)
++        }
++    }
+ 
+-    // Launcher para seleccionar imagen de galería
++    // Launcher para galería
+     val galleryLauncher = rememberLauncherForActivityResult(
+         ActivityResultContracts.GetContent()
+     ) { uri: Uri? ->
+-        uri?.let { processImage(context, scanner, it, onItemsScanned) { result ->
+-            scanResult = result
+-            showConfirmDialog = true
+-        }}
++        uri?.let {
++            processImage(it)
++        }
+     }
+ 
+     // Launcher para permiso de cámara
+@@ -91,12 +99,16 @@ fun ScanReceiptScreen(
+         ActivityResultContracts.RequestPermission()
+     ) { isGranted ->
+         hasCameraPermission = isGranted
+-    }
+-
+-    // Solicitar permiso al iniciar
+-    LaunchedEffect(Unit) {
+-        if (!hasCameraPermission) {
+-            permissionLauncher.launch(Manifest.permission.CAMERA)
++        if (isGranted) {
++            // Lanzar cámara directamente después de conceder el permiso
++            val photoFile = File(context.cacheDir, "receipt_capture.jpg")
++            val photoUri = FileProvider.getUriForFile(
++                context,
++                "${context.packageName}.fileprovider",
++                photoFile
++            )
++            capturedImageUri = photoUri
++            cameraLauncher.launch(photoUri)
+         }
+     }
+ 
+@@ -107,12 +119,13 @@ fun ScanReceiptScreen(
+                     Text(
+                         "Escanear Factura",
+                         fontWeight = FontWeight.Bold,
+-                        fontSize = 20.sp
++                        fontSize = 20.sp,
++                        color = GreenDark
+                     )
+                 },
+                 navigationIcon = {
+                     IconButton(onClick = onNavigateBack) {
+-                        Icon(Icons.Default.ArrowBack, contentDescription = "Volver")
++                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver al formulario", tint = GreenDark)
+                     }
+                 },
+                 colors = TopAppBarDefaults.topAppBarColors(
+@@ -122,313 +135,119 @@ fun ScanReceiptScreen(
+         },
+         containerColor = BackgroundColor
+     ) { padding ->
+-        Box(
+-            modifier = Modifier
+-                .fillMaxSize()
+-                .padding(padding)
+-        ) {
+-            if (hasCameraPermission) {
+-                CameraPreview(
+-                    modifier = Modifier.fillMaxSize(),
+-                    onImageCaptured = { uri ->
+-                        processImage(context, scanner, uri, onItemsScanned) { result ->
+-                            scanResult = result
+-                            showConfirmDialog = true
+-                        }
+-                    }
+-                )
+-            } else {
+-                Box(
+-                    modifier = Modifier.fillMaxSize(),
+-                    contentAlignment = Alignment.Center
+-                ) {
+-                    Column(
+-                        horizontalAlignment = Alignment.CenterHorizontally,
+-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+-                    ) {
+-                        Icon(
+-                            Icons.Default.CameraAlt,
+-                            contentDescription = null,
+-                            modifier = Modifier.size(64.dp),
+-                            tint = Color.Gray
+-                        )
+-                        Text(
+-                            "Permiso de cámara requerido",
+-                            color = Color.Gray,
+-                            fontSize = 16.sp
+-                        )
+-                        Button(onClick = {
+-                            permissionLauncher.launch(Manifest.permission.CAMERA)
+-                        }) {
+-                            Text("Conceder permiso")
+-                        }
+-                    }
++        if (isProcessing) {
++            Box(
++                modifier = Modifier
++                    .fillMaxSize()
++                    .padding(padding),
++                contentAlignment = Alignment.Center
++            ) {
++                Column(horizontalAlignment = Alignment.CenterHorizontally) {
++                    CircularProgressIndicator(color = GreenDark)
++                    Spacer(modifier = Modifier.height(16.dp))
++                    Text("Procesando imagen con OCR...", color = GreenDark)
+                 }
+             }
+-
+-            // Controles en la parte inferior
++        } else {
+             Column(
+                 modifier = Modifier
+-                    .align(Alignment.BottomCenter)
+-                    .fillMaxWidth()
+-                    .padding(24.dp),
++                    .fillMaxSize()
++                    .padding(padding),
+                 horizontalAlignment = Alignment.CenterHorizontally,
+-                verticalArrangement = Arrangement.spacedBy(16.dp)
++                verticalArrangement = Arrangement.Center
+             ) {
+-                // Botón de galería
++                // Botones de acción centrados
+                 Row(
+-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
++                    horizontalArrangement = Arrangement.spacedBy(32.dp),
++                    verticalAlignment = Alignment.CenterVertically
+                 ) {
+-                    FloatingActionButton(
+-                        onClick = { showGalleryPicker = true },
+-                        containerColor = Color.White,
+-                        contentColor = GreenDark,
+-                        modifier = Modifier.size(56.dp)
+-                    ) {
+-                        Icon(Icons.Default.PhotoLibrary, contentDescription = "Seleccionar de galería")
+-                    }
+-
+-                    // Botón de capturar
+-                    FloatingActionButton(
+-                        onClick = { /* Capturar se hace con el botón grande */ },
+-                        containerColor = GreenDark,
+-                        contentColor = Color.White,
+-                        modifier = Modifier.size(72.dp),
+-                        shape = CircleShape
++                    // Botón galería
++                    Column(
++                        horizontalAlignment = Alignment.CenterHorizontally,
++                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                     ) {
+-                        Icon(Icons.Default.CameraAlt, contentDescription = "Capturar")
++                        FloatingActionButton(
++                            onClick = { galleryLauncher.launch("image/*") },
++                            containerColor = Color.White,
++                            contentColor = GreenDark,
++                            modifier = Modifier.size(80.dp),
++                            elevation = FloatingActionButtonDefaults.elevation(4.dp)
++                        ) {
++                            Icon(
++                                Icons.Default.PhotoLibrary,
++                                contentDescription = "Galería",
++                                modifier = Modifier.size(40.dp)
++                            )
++                        }
++                        Text(
++                            text = "Galería",
++                            fontSize = 14.sp,
++                            fontWeight = FontWeight.Medium,
++                            color = GreenDark
++                        )
+                     }
+ 
+-                    // Placeholder para balance
+-                    Spacer(modifier = Modifier.size(56.dp))
+-                }
+-
+-                Text(
+-                    "Apunta a una factura o ticket para escanear los productos",
+-                    color = Color.White,
+-                    fontSize = 12.sp,
+-                    modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(8.dp)).padding(8.dp)
+-                )
+-            }
+-
+-            // Loading overlay
+-            if (isProcessing) {
+-                Box(
+-                    modifier = Modifier
+-                        .fillMaxSize()
+-                        .background(Color.Black.copy(alpha = 0.7f)),
+-                    contentAlignment = Alignment.Center
+-                ) {
+-                    Card(
+-                        modifier = Modifier.padding(32.dp),
+-                        shape = RoundedCornerShape(16.dp)
++                    // Botón cámara
++                    Column(
++                        horizontalAlignment = Alignment.CenterHorizontally,
++                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                     ) {
+-                        Column(
+-                            modifier = Modifier.padding(24.dp),
+-                            horizontalAlignment = Alignment.CenterHorizontally,
+-                            verticalArrangement = Arrangement.spacedBy(16.dp)
++                        FloatingActionButton(
++                            onClick = {
++                                if (hasCameraPermission) {
++                                    val photoFile = File(context.cacheDir, "receipt_capture.jpg")
++                                    val photoUri = FileProvider.getUriForFile(
++                                        context,
++                                        "${context.packageName}.fileprovider",
++                                        photoFile
++                                    )
++                                    capturedImageUri = photoUri
++                                    cameraLauncher.launch(photoUri)
++                                } else {
++                                    permissionLauncher.launch(Manifest.permission.CAMERA)
++                                }
++                            },
++                            containerColor = GreenDark,
++                            contentColor = Color.White,
++                            modifier = Modifier.size(96.dp),
++                            shape = CircleShape,
++                            elevation = FloatingActionButtonDefaults.elevation(6.dp)
+                         ) {
+-                            CircularProgressIndicator(
+-                                color = GreenDark,
++                            Icon(
++                                Icons.Default.CameraAlt,
++                                contentDescription = "Cámara",
+                                 modifier = Modifier.size(48.dp)
+                             )
+-                            Text(
+-                                "Procesando factura...",
+-                                fontWeight = FontWeight.Medium,
+-                                fontSize = 16.sp
+-                            )
+-                            Text(
+-                                "Extrayendo productos con OCR",
+-                                color = Color.Gray,
+-                                fontSize = 13.sp
+-                            )
+                         }
++                        Text(
++                            text = "Cámara",
++                            fontSize = 14.sp,
++                            fontWeight = FontWeight.Medium,
++                            color = GreenDark
++                        )
+                     }
+                 }
+-            }
+-        }
+-    }
+ 
+-    // Dialog para seleccionar de galería
+-    if (showGalleryPicker) {
+-        galleryLauncher.launch("image/*")
+-        showGalleryPicker = false
+-    }
++                Spacer(modifier = Modifier.height(24.dp))
+ 
+-    // Dialog de confirmación
+-    if (showConfirmDialog && scanResult != null) {
+-        ScanResultDialog(
+-            result = scanResult!!,
+-            onConfirm = {
+-                onItemsScanned(scanResult!!.items, scanResult!!.purchaseDate)
+-                showConfirmDialog = false
+-                onNavigateBack()
+-            },
+-            onDismiss = {
+-                showConfirmDialog = false
+-                scanResult = null
++                Text(
++                    "Selecciona una imagen de tu factura o ticket",
++                    color = Color.Gray,
++                    fontWeight = FontWeight.Medium,
++                    fontSize = 14.sp
++                )
+             }
+-        )
+-    }
+-}
+-
+-@Composable
+-private fun CameraPreview(
+-    modifier: Modifier = Modifier,
+-    onImageCaptured: (Uri) -> Unit
+-) {
+-    val context = LocalContext.current
+-    val lifecycleOwner = LocalLifecycleOwner.current
+-    val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
+-
+-    var imageCapture by remember { mutableStateOf<ImageCapture?>(null) }
+-    var lensFacing by remember { mutableStateOf(CameraSelector.LENS_FACING_BACK) }
+-
+-    LaunchedEffect(Unit) {
+-        val cameraProvider = cameraProviderFuture.get()
+-        val preview = Preview.Builder().build().also {
+-            it.setSurfaceProvider(
+-                AndroidView(
+-                    factory = { ctx ->
+-                        PreviewView(ctx).apply {
+-                            scaleType = PreviewView.ScaleType.FILL_CENTER
+-                        }
+-                    },
+-                    modifier = modifier
+-                ).findViewById<PreviewView>(android.R.id.content)?.surfaceProvider
+-                    ?: it.surfaceProvider
+-            )
+-        }
+-
+-        imageCapture = ImageCapture.Builder()
+-            .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
+-            .build()
+-
+-        val cameraSelector = CameraSelector.Builder()
+-            .requireLensFacing(lensFacing)
+-            .build()
+-
+-        try {
+-            cameraProvider.unbindAll()
+-            cameraProvider.bindToLifecycle(
+-                lifecycleOwner,
+-                cameraSelector,
+-                preview,
+-                imageCapture
+-            )
+-        } catch (e: Exception) {
+-            Log.e("CameraPreview", "Error binding camera", e)
+         }
+     }
+ 
+-    // Botón para capturar (se maneja desde el padre)
+-    LaunchedEffect(imageCapture) {
+-        // El botón de capturar está en el padre
++    // Handle system back button
++    BackHandler {
++        onNavigateBack()
+     }
+-}
+ 
+-private fun processImage(
+-    context: Context,
+-    scanner: ReceiptScanner,
+-    uri: Uri,
+-    onItemsScanned: (List<ScannedItem>, String?) -> Unit,
+-    onResult: (ReceiptScanResult) -> Unit
+-) {
+-    kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+-        try {
+-            val result = scanner.scanReceipt(uri)
+-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+-                onResult(result)
+-            }
+-        } catch (e: Exception) {
+-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+-                Toast.makeText(
+-                    context,
+-                    "Error procesando imagen: ${e.message}",
+-                    Toast.LENGTH_LONG
+-                ).show()
+-            }
++    DisposableEffect(Unit) {
++        onDispose {
++            scanner.close()
+         }
+     }
+ }
+-
+-@Composable
+-private fun ScanResultDialog(
+-    result: ReceiptScanResult,
+-    onConfirm: () -> Unit,
+-    onDismiss: () -> Unit
+-) {
+-    AlertDialog(
+-        onDismissRequest = onDismiss,
+-        title = { Text("Productos Detectados") },
+-        text = {
+-            Column(
+-                modifier = Modifier
+-                    .fillMaxWidth()
+-                    .verticalScroll(rememberScrollState()),
+-                verticalArrangement = Arrangement.spacedBy(8.dp)
+-            ) {
+-                if (result.error != null) {
+-                    Text(
+-                        result.error,
+-                        color = MaterialTheme.colorScheme.error
+-                    )
+-                } else if (result.items.isEmpty()) {
+-                    Text("No se detectaron productos. Intenta con otra imagen.")
+-                } else {
+-                    Text("Se detectaron ${result.items.size} productos:")
+-                    result.items.forEach { item ->
+-                        Card(
+-                            modifier = Modifier.fillMaxWidth(),
+-                            shape = RoundedCornerShape(8.dp)
+-                        ) {
+-                            Column(modifier = Modifier.padding(12.dp)) {
+-                                Text(
+-                                    item.name,
+-                                    fontWeight = FontWeight.SemiBold,
+-                                    fontSize = 14.sp
+-                                )
+-                                Row(
+-                                    modifier = Modifier.fillMaxWidth(),
+-                                    horizontalArrangement = Arrangement.SpaceBetween
+-                                ) {
+-                                    Text(
+-                                        item.category,
+-                                        color = Color.Gray,
+-                                        fontSize = 12.sp
+-                                    )
+-                                    if (item.price != null) {
+-                                        Text(
+-                                            "$${item.price}",
+-                                            fontWeight = FontWeight.Bold,
+-                                            fontSize = 14.sp
+-                                        )
+-                                    }
+-                                }
+-                            }
+-                        }
+-                    }
+-                }
+-
+-                if (result.purchaseDate != null) {
+-                    Spacer(modifier = Modifier.height(8.dp))
+-                    Text(
+-                        "Fecha de compra: ${result.purchaseDate}",
+-                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+-                        color = Color.Gray
+-                    )
+-                }
+-            }
+-        },
+-        confirmButton = {
+-            Button(onClick = onConfirm) {
+-                Text("Agregar al inventario")
+-            }
+-        },
+-        dismissButton = {
+-            TextButton(onClick = onDismiss) {
+-                Text("Cancelar")
+-            }
+-        }
+-    )
+-}

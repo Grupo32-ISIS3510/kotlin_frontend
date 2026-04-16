@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -38,26 +39,26 @@ fun AddItemScreen(
 ) {
     val addItemState by viewModel.addItemState.collectAsState()
 
-    var name by remember { mutableStateOf("") }
-    var category by remember { mutableStateOf("Frutas") }
-    var quantity by remember { mutableStateOf("") }
-    var purchaseDate by remember { mutableStateOf("") }
-    var expiryDate by remember { mutableStateOf("") }
-    var expanded by remember { mutableStateOf(false) }
+    var name by rememberSaveable { mutableStateOf("") }
+    var category by rememberSaveable { mutableStateOf("Frutas") }
+    var quantity by rememberSaveable { mutableStateOf("") }
+    var purchaseDate by rememberSaveable { mutableStateOf("") }
+    var expiryDate by rememberSaveable { mutableStateOf("") }
+    var expanded by rememberSaveable { mutableStateOf(false) }
 
-    var nameError by remember { mutableStateOf(false) }
-    var quantityError by remember { mutableStateOf(false) }
-    var purchaseDateError by remember { mutableStateOf(false) }
-    var expiryDateError by remember { mutableStateOf(false) }
+    var nameError by rememberSaveable { mutableStateOf(false) }
+    var quantityError by rememberSaveable { mutableStateOf(false) }
+    var purchaseDateError by rememberSaveable { mutableStateOf(false) }
+    var expiryDateError by rememberSaveable { mutableStateOf(false) }
 
     // Predicción automática de fecha de expiración
-    var showPredictionTip by remember { mutableStateOf(false) }
-    var predictedExpiryDate by remember { mutableStateOf("") }
-    var storageTip by remember { mutableStateOf("") }
+    var showPredictionTip by rememberSaveable { mutableStateOf(false) }
+    var predictedExpiryDate by rememberSaveable { mutableStateOf("") }
+    var storageTip by rememberSaveable { mutableStateOf("") }
 
     // Selectores de fecha
-    var showPurchaseDatePicker by remember { mutableStateOf(false) }
-    var showExpiryDatePicker by remember { mutableStateOf(false) }
+    var showPurchaseDatePicker by rememberSaveable { mutableStateOf(false) }
+    var showExpiryDatePicker by rememberSaveable { mutableStateOf(false) }
 
     // Actualizar predicción cuando cambia categoría o fecha de compra
     LaunchedEffect(category, purchaseDate) {
@@ -71,10 +72,11 @@ fun AddItemScreen(
         }
     }
 
-    // Navegar atrás al éxito
+    // Navegar atrás al éxito (una sola vez)
     LaunchedEffect(addItemState) {
         if (addItemState is AddItemUiState.Success) {
             onNavigateBack()
+            viewModel.resetAddItemState()
         }
     }
 
@@ -139,7 +141,7 @@ fun AddItemScreen(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 isError = nameError,
-                supportingText = { if (nameError) Text("Campo requerido") },
+                supportingText = { if (nameError) Text("El nombre es requerido") },
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = GreenDark,
                     focusedLabelColor = GreenDark
@@ -188,7 +190,7 @@ fun AddItemScreen(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 isError = quantityError,
-                supportingText = { if (quantityError) Text("Ingresa un número válido") },
+                supportingText = { if (quantityError) Text("La cantidad debe ser un número válido (ej: 2, 1.5)") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = GreenDark,
@@ -206,7 +208,7 @@ fun AddItemScreen(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 isError = purchaseDateError,
-                supportingText = { if (purchaseDateError) Text("Campo requerido") },
+                supportingText = { if (purchaseDateError) Text("La fecha de compra es requerida") },
                 trailingIcon = {
                     IconButton(onClick = { showPurchaseDatePicker = true }) {
                         Icon(Icons.Default.CalendarToday, contentDescription = "Seleccionar fecha")
@@ -221,9 +223,9 @@ fun AddItemScreen(
 
             // Dialog selector de fecha de compra
             if (showPurchaseDatePicker) {
-                var selectedYear by remember { mutableStateOf(LocalDate.now().year) }
-                var selectedMonth by remember { mutableStateOf(LocalDate.now().monthValue - 1) }
-                var selectedDay by remember { mutableStateOf(LocalDate.now().dayOfMonth) }
+                var selectedYear by rememberSaveable { mutableStateOf(LocalDate.now().year) }
+                var selectedMonth by rememberSaveable { mutableStateOf(LocalDate.now().monthValue - 1) }
+                var selectedDay by rememberSaveable { mutableStateOf(LocalDate.now().dayOfMonth) }
                 
                 AlertDialog(
                     onDismissRequest = { showPurchaseDatePicker = false },
@@ -310,7 +312,7 @@ fun AddItemScreen(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 isError = expiryDateError,
-                supportingText = { if (expiryDateError) Text("Campo requerido") },
+                supportingText = { if (expiryDateError) Text("La fecha de vencimiento es requerida") },
                 trailingIcon = {
                     IconButton(onClick = { showExpiryDatePicker = true }) {
                         Icon(Icons.Default.CalendarToday, contentDescription = "Seleccionar fecha")
@@ -325,9 +327,9 @@ fun AddItemScreen(
 
             // Dialog selector de fecha de expiración
             if (showExpiryDatePicker) {
-                var expYear by remember { mutableStateOf(LocalDate.now().year) }
-                var expMonth by remember { mutableStateOf(LocalDate.now().monthValue - 1) }
-                var expDay by remember { mutableStateOf(LocalDate.now().dayOfMonth) }
+                var expYear by rememberSaveable { mutableStateOf(LocalDate.now().year) }
+                var expMonth by rememberSaveable { mutableStateOf(LocalDate.now().monthValue - 1) }
+                var expDay by rememberSaveable { mutableStateOf(LocalDate.now().dayOfMonth) }
                 
                 AlertDialog(
                     onDismissRequest = { showExpiryDatePicker = false },
