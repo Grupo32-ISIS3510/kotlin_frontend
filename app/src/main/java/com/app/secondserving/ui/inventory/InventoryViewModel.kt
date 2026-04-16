@@ -61,7 +61,7 @@ class InventoryViewModel(private val repository: InventoryRepository) : ViewMode
                     val today = LocalDate.now()
                     allItems = result.data.map { item ->
                         val daysRemaining = try {
-                            val expiry = LocalDate.parse(item.expiry_date)
+                            val expiry = LocalDate.parse(item.expiryDate)
                             ChronoUnit.DAYS.between(today, expiry)
                         } catch (e: DateTimeParseException) {
                             0L

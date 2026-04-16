@@ -8,6 +8,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -16,7 +18,8 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.MenuBook
-import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.unit.dp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -63,7 +66,7 @@ fun MyApplicationApp() {
     var showScanReceipt by remember { mutableStateOf(false) }
     var selectedItem by remember { mutableStateOf<InventoryItemUi?>(null) }
     var selectedItemTip by remember { mutableStateOf("") }
-    // Pedir permiso de notificaciones (Android 13+)
+
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { _ -> }
@@ -88,13 +91,11 @@ fun MyApplicationApp() {
         )
     )
 
-    // Pantalla de escanear factura
     if (showScanReceipt) {
         ScanReceiptScreen(
             onItemsScanned = { items, purchaseDate ->
-                // Aquí se podrían agregar los items escaneados al inventario
                 showScanReceipt = false
-                showAddItem = true // Ir a pantalla de agregar para confirmar
+                showAddItem = true
             },
             onNavigateBack = { showScanReceipt = false }
         )
@@ -129,13 +130,26 @@ fun MyApplicationApp() {
         bottomBar = {
             NavigationBar(containerColor = Color.White) {
                 AppDestinations.entries.forEachIndexed { index, destination ->
+                    // Insertar botón "+" en el centro (entre índice 1 y 2)
                     if (index == 2) {
-                        NavigationBarItem(
-                            selected = false,
-                            onClick = {},
-                            icon = {},
-                            enabled = false
-                        )
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .align(Alignment.CenterVertically),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            FloatingActionButton(
+                                onClick = {
+                                    inventoryViewModel.resetAddItemState()
+                                    showAddItem = true
+                                },
+                                containerColor = Color(0xFF386641),
+                                contentColor = Color.White,
+                                modifier = Modifier.size(52.dp)
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = "Agregar producto")
+                            }
+                        }
                     }
                     NavigationBarItem(
                         selected = currentDestination == destination,
@@ -152,40 +166,7 @@ fun MyApplicationApp() {
                     )
                 }
             }
-        },
-        floatingActionButton = {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // Botón de escanear
-                FloatingActionButton(
-                    onClick = {
-                        inventoryViewModel.resetAddItemState()
-                        showScanReceipt = true
-                    },
-                    containerColor = Color(0xFFFF6F00),
-                    contentColor = Color.White,
-                    modifier = Modifier.size(56.dp)
-                ) {
-                    Icon(
-                        androidx.compose.material.icons.filled.QrCodeScanner,
-                        contentDescription = "Escanear factura"
-                    )
-                }
-                // Botón de agregar manual
-                FloatingActionButton(
-                    onClick = {
-                        inventoryViewModel.resetAddItemState()
-                        showAddItem = true
-                    },
-                    containerColor = Color(0xFF386641),
-                    contentColor = Color.White
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = "Agregar producto")
-                }
-            }
-        },
-        floatingActionButtonPosition = FabPosition.Center
+        }
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding)) {
             when (currentDestination) {

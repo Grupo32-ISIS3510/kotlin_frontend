@@ -30,10 +30,10 @@ class SecondServingApp : Application() {
         super.onCreate()
         sessionManager = SessionManager(this)
         database = AppDatabase.getDatabase(this)
+        RetrofitClient.init(sessionManager)
         inventoryRepository = InventoryRepository(database)
         expirationNotifier = ExpirationNotifier(this, inventoryRepository)
         expirationNotifier.startObserving()
-        RetrofitClient.init(sessionManager)
         registerFcmTokenIfLoggedIn()
     }
 
