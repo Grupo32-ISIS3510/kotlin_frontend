@@ -47,6 +47,12 @@ import java.util.*
 import java.util.concurrent.Executor
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private val GreenDark = Color(0xFF386641)
 private val BackgroundColor = Color(0xFFF5F5F0)
@@ -284,20 +290,16 @@ private fun CameraPreview(
     var imageCapture by remember { mutableStateOf<ImageCapture?>(null) }
     var lensFacing by remember { mutableStateOf(CameraSelector.LENS_FACING_BACK) }
 
+    val previewView = remember {
+        PreviewView(context).apply {
+            scaleType = PreviewView.ScaleType.FILL_CENTER
+        }
+    }
+
     LaunchedEffect(Unit) {
         val cameraProvider = cameraProviderFuture.get()
         val preview = Preview.Builder().build().also {
-            it.setSurfaceProvider(
-                AndroidView(
-                    factory = { ctx ->
-                        PreviewView(ctx).apply {
-                            scaleType = PreviewView.ScaleType.FILL_CENTER
-                        }
-                    },
-                    modifier = modifier
-                ).findViewById<PreviewView>(android.R.id.content)?.surfaceProvider
-                    ?: it.surfaceProvider
-            )
+            it.setSurfaceProvider(previewView.surfaceProvider)
         }
 
         imageCapture = ImageCapture.Builder()
@@ -321,10 +323,10 @@ private fun CameraPreview(
         }
     }
 
-    // Botón para capturar (se maneja desde el padre)
-    LaunchedEffect(imageCapture) {
-        // El botón de capturar está en el padre
-    }
+    AndroidView(
+        factory = { previewView },
+        modifier = modifier
+    )
 }
 
 private fun processImage(
@@ -334,14 +336,14 @@ private fun processImage(
     onItemsScanned: (List<ScannedItem>, String?) -> Unit,
     onResult: (ReceiptScanResult) -> Unit
 ) {
-    kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+    CoroutineScope(Dispatchers.IO).launch {
         try {
             val result = scanner.scanReceipt(uri)
-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+            withContext(Dispatchers.Main) {
                 onResult(result)
             }
         } catch (e: Exception) {
-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+            withContext(Dispatchers.Main) {
                 Toast.makeText(
                     context,
                     "Error procesando imagen: ${e.message}",
@@ -351,7 +353,6 @@ private fun processImage(
         }
     }
 }
-
 @Composable
 private fun ScanResultDialog(
     result: ReceiptScanResult,

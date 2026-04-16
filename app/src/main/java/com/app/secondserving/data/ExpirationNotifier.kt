@@ -101,8 +101,8 @@ class ExpirationNotifier(private val context: Context, private val repository: I
         }
 
         val title = when {
-            daysRemaining == 0 -> "¡${item.name} vence hoy!"
-            daysRemaining == 1 -> "¡${item.name} vence mañana!"
+            daysRemaining == 0L -> "¡${item.name} vence hoy!"
+            daysRemaining == 1L -> "¡${item.name} vence mañana!"
             else -> "${item.name} vence en $daysRemaining días"
         }
 

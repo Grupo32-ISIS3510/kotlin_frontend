@@ -69,8 +69,6 @@ dependencies {
     // Room Database
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
-    annotationProcessor(libs.androidx.room.compiler)
-    // Para Kotlin usa kapt
     kapt(libs.androidx.room.compiler)
 
     // CameraX para escaneo OCR
