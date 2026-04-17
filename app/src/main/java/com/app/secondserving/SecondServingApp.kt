@@ -7,6 +7,7 @@ import com.app.secondserving.data.InventoryRepository
 import com.app.secondserving.data.SessionManager
 import com.app.secondserving.data.local.AppDatabase
 import com.app.secondserving.data.network.RetrofitClient
+import com.app.secondserving.notifications.ExpirationCheckWorker
 import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -36,8 +37,9 @@ class SecondServingApp : Application() {
         database = AppDatabase.getDatabase(this)
         RetrofitClient.init(sessionManager)
         inventoryRepository = InventoryRepository(database)
-        expirationNotifier = ExpirationNotifier(this, inventoryRepository)
-        expirationNotifier.startObserving()
+        expirationNotifier = ExpirationNotifier(this)
+        expirationNotifier.createNotificationChannel()
+        ExpirationCheckWorker.enqueueDaily(this)
         registerFcmTokenIfLoggedIn()
     }
 

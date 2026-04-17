@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
@@ -13,116 +14,97 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.app.secondserving.MainActivity
-import com.app.secondserving.R
 import com.app.secondserving.data.local.FoodItemEntity
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
 /**
- * Observer Pattern - Notificador de expiración de alimentos.
- * Patrón Observer:
- * - Observa cambios en los items del inventario
- * - Notifica cuando un alimento está por expirar
- * - Usa notificaciones locales de Android
+ * Notificador de expiración de alimentos.
+ * - Stateless respecto a Flows: no observa la DB.
+ * - Deduplica notificaciones por (itemId, fecha) usando SharedPreferences,
+ *   así un item sólo genera una notificación por día aunque se dispare el
+ *   chequeo varias veces.
  */
-class ExpirationNotifier(private val context: Context, private val repository: InventoryRepository) {
+class ExpirationNotifier(private val context: Context) {
 
     companion object {
-        private const val CHANNEL_ID = "expiration_alerts"
-        private const val CHANNEL_NAME = "Alertas de Expiración"
-        private const val NOTIFICATION_DELAY_MS = 5000L // 5 segundos entre notificaciones
+        const val CHANNEL_ID = "expiry_alerts"
+        private const val CHANNEL_NAME = "Alertas de vencimiento"
+        private const val PREFS_NAME = "expiration_notifier_prefs"
+        private const val KEY_NOTIFIED_SET = "notified_keys"
     }
 
-    private var observerJob: Job? = null
+    private val prefs: SharedPreferences =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-    /**
-     * Crea el canal de notificaciones (requerido Android 8+).
-     */
     fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val importance = NotificationManager.IMPORTANCE_HIGH
-            val channel = NotificationChannel(CHANNEL_ID, CHANNEL_NAME, importance).apply {
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                CHANNEL_NAME,
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
                 description = "Notificaciones cuando los alimentos están por expirar"
                 enableVibration(true)
                 setShowBadge(true)
             }
-            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            notificationManager.createNotificationChannel(channel)
+            val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            manager.createNotificationChannel(channel)
         }
     }
 
     /**
-     * Inicia el observador que monitorea los items que expiran pronto.
-     * Idempotente: si ya está observando, no inicia otro.
+     * Chequeo único: notifica una vez al día por item que venza en ≤3 días.
+     * Lo llama el worker diario o el flujo de "item recién agregado".
      */
-    fun startObserving() {
-        // Evitar scopes huérfanos si se llama dos veces
-        if (observerJob?.isActive == true) return
-
-        stopObserving() // Cancela cualquier scope previo que haya fallado
-
+    fun checkAndNotify(items: List<FoodItemEntity>) {
         createNotificationChannel()
+        pruneOldKeys()
 
-        val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+        val today = LocalDate.now().toString()
+        val notified = prefs.getStringSet(KEY_NOTIFIED_SET, emptySet())!!.toMutableSet()
 
-        observerJob = scope.launch {
-            repository.getExpiringSoonItems().collectLatest { items ->
-                items.forEach { item ->
-                    val daysRemaining = calculateDaysRemaining(item.expiryDate)
-                    if (daysRemaining >= 0 && daysRemaining <= 3) {
-                        sendExpirationNotification(item, daysRemaining)
-                        delay(NOTIFICATION_DELAY_MS)
-                    }
+        items.forEach { item ->
+            val key = "${item.id}:$today"
+            if (key in notified) return@forEach
+
+            val daysRemaining = calculateDaysRemaining(item.expiryDate)
+            if (daysRemaining in 0..3) {
+                if (sendExpirationNotification(item, daysRemaining)) {
+                    notified += key
                 }
             }
         }
+
+        prefs.edit().putStringSet(KEY_NOTIFIED_SET, notified).apply()
     }
 
-    /**
-     * Detiene el observador.
-     */
-    fun stopObserving() {
-        observerJob?.cancel()
-        observerJob = null
+    fun notifyImmediateExpiration(item: FoodItemEntity) {
+        checkAndNotify(listOf(item))
     }
 
-    /**
-     * Envía una notificación de expiración para un item.
-     */
-    private fun sendExpirationNotification(item: FoodItemEntity, daysRemaining: Long) {
-        // Verificar permiso para notificaciones (Android 13+)
+    private fun sendExpirationNotification(item: FoodItemEntity, daysRemaining: Long): Boolean {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(
                     context,
                     Manifest.permission.POST_NOTIFICATIONS
                 ) != PackageManager.PERMISSION_GRANTED
             ) {
-                return // No tenemos permiso para notificar
+                return false
             }
         }
 
-        val title = when {
-            daysRemaining == 0L -> "¡${item.name} vence hoy!"
-            daysRemaining == 1L -> "¡${item.name} vence mañana!"
+        val title = when (daysRemaining) {
+            0L -> "¡${item.name} vence hoy!"
+            1L -> "¡${item.name} vence mañana!"
             else -> "${item.name} vence en $daysRemaining días"
         }
-
         val message = "Categoría: ${item.category} | Cantidad: ${item.quantity}"
 
-        // Intent para abrir la app al tocar la notificación
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
             putExtra("expiring_item_id", item.id)
         }
-
         val pendingIntent = PendingIntent.getActivity(
             context,
             item.id.hashCode(),
@@ -130,11 +112,10 @@ class ExpirationNotifier(private val context: Context, private val repository: I
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        // Color según urgencia
         val color = when {
-            daysRemaining <= 1L -> 0xFFFF0000.toInt() // Rojo
-            daysRemaining <= 3L -> 0xFFFFA500.toInt() // Naranja
-            else -> 0xFFFFFF00.toInt() // Amarillo
+            daysRemaining <= 1L -> 0xFFFF0000.toInt()
+            daysRemaining <= 3L -> 0xFFFFA500.toInt()
+            else -> 0xFFFFFF00.toInt()
         }
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
@@ -148,35 +129,25 @@ class ExpirationNotifier(private val context: Context, private val repository: I
             .setContentIntent(pendingIntent)
             .build()
 
-        // Enviar notificación
-        NotificationManagerCompat.from(context).notify(
-            item.id.hashCode(),
-            notification
-        )
+        NotificationManagerCompat.from(context).notify(item.id.hashCode(), notification)
+        return true
     }
 
-    /**
-     * Calcula días restantes hasta la expiración.
-     */
     private fun calculateDaysRemaining(expiryDate: String): Long {
         return try {
-            val expiry = LocalDate.parse(expiryDate)
-            val today = LocalDate.now()
-            ChronoUnit.DAYS.between(today, expiry)
+            ChronoUnit.DAYS.between(LocalDate.now(), LocalDate.parse(expiryDate))
         } catch (e: Exception) {
-            Log.w("ExpirationNotifier", "Fecha de expiración inválida: $expiryDate", e)
-            Long.MAX_VALUE // Tratamos fecha inválida como "nunca expira" para no notificar falsos positivos
+            Log.w("ExpirationNotifier", "Fecha inválida: $expiryDate", e)
+            Long.MAX_VALUE
         }
     }
 
-    /**
-     * Envía una notificación inmediata para un item específico.
-     * Útil cuando el usuario agrega un item que ya está cerca de expirar.
-     */
-    fun notifyImmediateExpiration(item: FoodItemEntity) {
-        val daysRemaining = calculateDaysRemaining(item.expiryDate)
-        if (daysRemaining >= 0 && daysRemaining <= 3) {
-            sendExpirationNotification(item, daysRemaining)
+    private fun pruneOldKeys() {
+        val today = LocalDate.now().toString()
+        val existing = prefs.getStringSet(KEY_NOTIFIED_SET, emptySet())!!
+        val pruned = existing.filter { it.endsWith(":$today") }.toSet()
+        if (pruned.size != existing.size) {
+            prefs.edit().putStringSet(KEY_NOTIFIED_SET, pruned).apply()
         }
     }
 }

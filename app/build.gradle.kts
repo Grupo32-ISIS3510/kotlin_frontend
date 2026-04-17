@@ -79,6 +79,9 @@ dependencies {
     // ML Kit para OCR (reconocimiento de texto)
     implementation(libs.mlkit.text.recognition)
 
+    // WorkManager para chequeo diario de expiración
+    implementation(libs.androidx.work.runtime.ktx)
+
     // Firebase
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.analytics)
