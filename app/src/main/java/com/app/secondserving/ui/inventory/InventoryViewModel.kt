@@ -57,8 +57,6 @@ class InventoryViewModel(private val repository: InventoryRepository) : ViewMode
 
     /**
      * Transforms a raw exception into a user-friendly message.
-     * Unwraps IOException cause chain since InventoryServiceAdapter
-     * wraps all exceptions, hiding the original type.
      */
     private fun getUserFriendlyMessage(exception: Throwable): String {
         val rootCause = unwrapCause(exception)
@@ -78,10 +76,6 @@ class InventoryViewModel(private val repository: InventoryRepository) : ViewMode
         }
     }
 
-    /**
-     * Walks the exception cause chain to find the root cause.
-     * Needed because InventoryServiceAdapter wraps everything in IOException.
-     */
     private fun unwrapCause(throwable: Throwable): Throwable {
         var current: Throwable = throwable
         while (current.cause != null && current.cause !== current) {
@@ -112,7 +106,7 @@ class InventoryViewModel(private val repository: InventoryRepository) : ViewMode
                             id = item.id,
                             name = item.name,
                             category = item.category,
-                            quantity = item.quantity,
+                            quantity = item.quantity.toInt(),
                             daysRemaining = daysRemaining,
                             urgency = urgency
                         )
@@ -148,6 +142,9 @@ class InventoryViewModel(private val repository: InventoryRepository) : ViewMode
         _uiState.value = InventoryUiState.Success(filtered)
     }
 
+    /**
+     * Crea un solo item.
+     */
     fun createInventoryItem(
         name: String,
         category: String,
@@ -172,6 +169,34 @@ class InventoryViewModel(private val repository: InventoryRepository) : ViewMode
                 is Result.Error -> {
                     _addItemState.value = AddItemUiState.Error(getUserFriendlyMessage(result.exception))
                 }
+            }
+        }
+    }
+
+    /**
+     * Anti-patrón resuelto: Manejo de carga masiva (Batch).
+     * Crea múltiples items de forma eficiente y maneja el estado de carga global.
+     */
+    fun createInventoryItems(items: List<InventoryItemRequest>) {
+        viewModelScope.launch {
+            _addItemState.value = AddItemUiState.Loading
+            var successCount = 0
+            var lastError: Throwable? = null
+
+            items.forEach { request ->
+                when (val result = repository.createInventoryItem(request)) {
+                    is Result.Success -> successCount++
+                    is Result.Error -> lastError = result.exception
+                }
+            }
+
+            if (successCount > 0) {
+                _addItemState.value = AddItemUiState.Success
+                loadInventory()
+            } else if (lastError != null) {
+                _addItemState.value = AddItemUiState.Error(getUserFriendlyMessage(lastError!!))
+            } else {
+                _addItemState.value = AddItemUiState.Idle
             }
         }
     }

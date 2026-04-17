@@ -179,7 +179,7 @@ object ShelfLifePredictor {
         val elapsedDays = ChronoUnit.DAYS.between(purchaseDate, today).toInt()
         
         if (totalDays <= 0) return 0
-        
+
         return ((totalDays - elapsedDays).toDouble() / totalDays.toDouble() * 100.0).coerceIn(0.0, 100.0).toInt()
     }
 

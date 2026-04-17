@@ -2,21 +2,19 @@ package com.app.secondserving
 
 import android.os.Build
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.MenuBook
@@ -27,10 +25,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.app.secondserving.data.InventoryRepository
 import com.app.secondserving.data.ScannedItem
+import com.app.secondserving.data.network.InventoryItemRequest
 import com.app.secondserving.ui.inventory.AddItemScreen
 import com.app.secondserving.ui.inventory.InventoryItemUi
 import com.app.secondserving.ui.inventory.InventoryScreen
@@ -38,6 +38,7 @@ import com.app.secondserving.ui.inventory.InventoryViewModel
 import com.app.secondserving.ui.inventory.InventoryViewModelFactory
 import com.app.secondserving.ui.inventory.ItemDetailScreen
 import com.app.secondserving.ui.inventory.ScanReceiptScreen
+import com.app.secondserving.ui.inventory.ReviewScanScreen
 import com.app.secondserving.ui.inventory.WeatherViewModel
 import com.app.secondserving.ui.theme.MyApplicationTheme
 
@@ -62,12 +63,17 @@ enum class AppDestinations(val label: String, val icon: ImageVector) {
 
 @Composable
 fun MyApplicationApp() {
+    val context = LocalContext.current
     var currentDestination by rememberSaveable { mutableStateOf(AppDestinations.DESPENSA) }
     var showAddItem by remember { mutableStateOf(false) }
     var showScanReceipt by remember { mutableStateOf(false) }
     var selectedItem by remember { mutableStateOf<InventoryItemUi?>(null) }
     var selectedItemTip by remember { mutableStateOf("") }
-    // Pedir permiso de notificaciones (Android 13+)
+    
+    // Estado para la pantalla de revisión
+    var itemsToReview by remember { mutableStateOf<List<ScannedItem>?>(null) }
+    var detectedDate by remember { mutableStateOf<String?>(null) }
+
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { _ -> }
@@ -85,22 +91,51 @@ fun MyApplicationApp() {
     val inventoryViewModel: InventoryViewModel = viewModel(
         factory = InventoryViewModelFactory(
             app?.inventoryRepository ?: InventoryRepository(
-                com.app.secondserving.data.local.AppDatabase.getDatabase(
-                    androidx.compose.ui.platform.LocalContext.current.applicationContext
-                )
+                com.app.secondserving.data.local.AppDatabase.getDatabase(context.applicationContext)
             )
         )
     )
 
-    // Pantalla de escanear factura
+    // Pantalla de Revisión
+    if (itemsToReview != null) {
+        ReviewScanScreen(
+            scannedItems = itemsToReview!!,
+            detectedPurchaseDate = detectedDate,
+            onConfirm = { reviewedItems ->
+                // Anti-patrón resuelto: Guardado masivo eficiente
+                val requests = reviewedItems.map { item ->
+                    InventoryItemRequest(
+                        name = item.name,
+                        category = item.category,
+                        quantity = item.quantity.toDouble(),
+                        purchase_date = item.purchaseDate,
+                        expiry_date = item.expiryDate
+                    )
+                }
+                inventoryViewModel.createInventoryItems(requests)
+                Toast.makeText(context, "Agregando ${requests.size} productos...", Toast.LENGTH_SHORT).show()
+                itemsToReview = null
+                currentDestination = AppDestinations.DESPENSA
+            },
+            onNavigateBack = {
+                itemsToReview = null
+                showScanReceipt = true
+            }
+        )
+        return
+    }
+
     if (showScanReceipt) {
         ScanReceiptScreen(
             onItemsScanned = { items, purchaseDate ->
-                // Aquí se podrían agregar los items escaneados al inventario
                 showScanReceipt = false
-                showAddItem = true // Ir a pantalla de agregar para confirmar
+                itemsToReview = items
+                detectedDate = purchaseDate
             },
-            onNavigateBack = { showScanReceipt = false }
+            onNavigateBack = { 
+                showScanReceipt = false
+                showAddItem = true
+            }
         )
         return
     }
@@ -134,12 +169,24 @@ fun MyApplicationApp() {
             NavigationBar(containerColor = Color.White) {
                 AppDestinations.entries.forEachIndexed { index, destination ->
                     if (index == 2) {
-                        NavigationBarItem(
-                            selected = false,
-                            onClick = {},
-                            icon = {},
-                            enabled = false
-                        )
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .align(Alignment.CenterVertically),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            FloatingActionButton(
+                                onClick = {
+                                    inventoryViewModel.resetAddItemState()
+                                    showAddItem = true
+                                },
+                                containerColor = Color(0xFF386641),
+                                contentColor = Color.White,
+                                modifier = Modifier.size(52.dp)
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = "Agregar producto")
+                            }
+                        }
                     }
                     NavigationBarItem(
                         selected = currentDestination == destination,
@@ -156,40 +203,7 @@ fun MyApplicationApp() {
                     )
                 }
             }
-        },
-        floatingActionButton = {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // Botón de escanear
-                FloatingActionButton(
-                    onClick = {
-                        inventoryViewModel.resetAddItemState()
-                        showScanReceipt = true
-                    },
-                    containerColor = Color(0xFFFF6F00),
-                    contentColor = Color.White,
-                    modifier = Modifier.size(56.dp)
-                ) {
-                    Icon(
-                        Icons.Default.CameraAlt,
-                        contentDescription = "Escanear factura"
-                    )
-                }
-                // Botón de agregar manual
-                FloatingActionButton(
-                    onClick = {
-                        inventoryViewModel.resetAddItemState()
-                        showAddItem = true
-                    },
-                    containerColor = Color(0xFF386641),
-                    contentColor = Color.White
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = "Agregar producto")
-                }
-            }
-        },
-        floatingActionButtonPosition = FabPosition.Center
+        }
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding)) {
             when (currentDestination) {

@@ -1,6 +1,7 @@
 package com.app.secondserving.ui.inventory
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -80,6 +81,17 @@ fun AddItemScreen(
         }
     }
 
+    val textFieldColors = OutlinedTextFieldDefaults.colors(
+        focusedBorderColor = GreenDark,
+        unfocusedBorderColor = GreenDark.copy(alpha = 0.5f),
+        focusedLabelColor = GreenDark,
+        unfocusedLabelColor = GreenDark,
+        focusedTextColor = GreenDark,
+        unfocusedTextColor = GreenDark,
+        focusedTrailingIconColor = GreenDark,
+        unfocusedTrailingIconColor = GreenDark
+    )
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -87,30 +99,43 @@ fun AddItemScreen(
                     Text(
                         "Agregar alimento",
                         fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp
+                        fontSize = 20.sp,
+                        color = GreenDark
                     )
                 },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Volver")
+                        Icon(
+                            Icons.Default.ArrowBack, 
+                            contentDescription = "Volver",
+                            tint = GreenDark
+                        )
                     }
                 },
                 actions = {
-                    // Botón para escanear factura
                     if (onOpenScanner != null) {
-                        IconButton(onClick = onOpenScanner) {
+                        Box(
+                            modifier = Modifier
+                                .padding(end = 12.dp)
+                                .clickable { onOpenScanner() }
+                                .padding(4.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
                             Column(
-                                horizontalAlignment = Alignment.CenterHorizontally
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
                             ) {
                                 Icon(
                                     Icons.Default.QrCodeScanner,
                                     contentDescription = "Escanear factura",
-                                    tint = GreenDark
+                                    tint = GreenDark,
+                                    modifier = Modifier.size(22.dp)
                                 )
                                 Text(
                                     text = "Escanear",
-                                    fontSize = 10.sp,
-                                    color = GreenDark
+                                    fontSize = 12.sp,
+                                    color = GreenDark,
+                                    fontWeight = FontWeight.ExtraBold
                                 )
                             }
                         }
@@ -142,10 +167,7 @@ fun AddItemScreen(
                 shape = RoundedCornerShape(12.dp),
                 isError = nameError,
                 supportingText = { if (nameError) Text("El nombre es requerido") },
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = GreenDark,
-                    focusedLabelColor = GreenDark
-                ),
+                colors = textFieldColors,
                 singleLine = true
             )
 
@@ -164,10 +186,7 @@ fun AddItemScreen(
                         .fillMaxWidth()
                         .menuAnchor(),
                     shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = GreenDark,
-                        focusedLabelColor = GreenDark
-                    )
+                    colors = textFieldColors
                 )
                 ExposedDropdownMenu(
                     expanded = expanded,
@@ -175,7 +194,7 @@ fun AddItemScreen(
                 ) {
                     CATEGORIES.forEach { option ->
                         DropdownMenuItem(
-                            text = { Text(option) },
+                            text = { Text(option, color = GreenDark) },
                             onClick = { category = option; expanded = false }
                         )
                     }
@@ -192,10 +211,7 @@ fun AddItemScreen(
                 isError = quantityError,
                 supportingText = { if (quantityError) Text("La cantidad debe ser un número válido (ej: 2, 1.5)") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = GreenDark,
-                    focusedLabelColor = GreenDark
-                ),
+                colors = textFieldColors,
                 singleLine = true
             )
 
@@ -211,13 +227,14 @@ fun AddItemScreen(
                 supportingText = { if (purchaseDateError) Text("La fecha de compra es requerida") },
                 trailingIcon = {
                     IconButton(onClick = { showPurchaseDatePicker = true }) {
-                        Icon(Icons.Default.CalendarToday, contentDescription = "Seleccionar fecha")
+                        Icon(
+                            Icons.Default.CalendarToday, 
+                            contentDescription = "Seleccionar fecha",
+                            tint = GreenDark
+                        )
                     }
                 },
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = GreenDark,
-                    focusedLabelColor = GreenDark
-                ),
+                colors = textFieldColors,
                 singleLine = true
             )
 
@@ -229,7 +246,7 @@ fun AddItemScreen(
                 
                 AlertDialog(
                     onDismissRequest = { showPurchaseDatePicker = false },
-                    title = { Text("Fecha de compra") },
+                    title = { Text("Fecha de compra", color = GreenDark) },
                     text = {
                         android.widget.DatePicker(
                             androidx.compose.ui.platform.LocalContext.current,
@@ -254,12 +271,12 @@ fun AddItemScreen(
                                 showPurchaseDatePicker = false
                             }
                         ) {
-                            Text("OK")
+                            Text("OK", color = GreenDark)
                         }
                     },
                     dismissButton = {
                         TextButton(onClick = { showPurchaseDatePicker = false }) {
-                            Text("Cancelar")
+                            Text("Cancelar", color = GreenDark)
                         }
                     }
                 )
@@ -286,17 +303,17 @@ fun AddItemScreen(
                         Text(
                             text = "Fecha de expiración estimada: $predictedExpiryDate",
                             fontSize = 13.sp,
-                            color = Color(0xFF2E7D32)
+                            color = GreenDark
                         )
                         Text(
                             text = "Almacenamiento recomendado: ${storageTip.ifBlank { "ambiente" }}",
                             fontSize = 13.sp,
-                            color = Color(0xFF555555)
+                            color = GreenDark
                         )
                         Text(
                             text = "Puedes editar la fecha manualmente si lo prefieres",
                             fontSize = 12.sp,
-                            color = Color(0xFF888888),
+                            color = GreenDark.copy(alpha = 0.6f),
                             fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
                         )
                     }
@@ -315,13 +332,14 @@ fun AddItemScreen(
                 supportingText = { if (expiryDateError) Text("La fecha de vencimiento es requerida") },
                 trailingIcon = {
                     IconButton(onClick = { showExpiryDatePicker = true }) {
-                        Icon(Icons.Default.CalendarToday, contentDescription = "Seleccionar fecha")
+                        Icon(
+                            Icons.Default.CalendarToday, 
+                            contentDescription = "Seleccionar fecha",
+                            tint = GreenDark
+                        )
                     }
                 },
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = GreenDark,
-                    focusedLabelColor = GreenDark
-                ),
+                colors = textFieldColors,
                 singleLine = true
             )
 
@@ -333,7 +351,7 @@ fun AddItemScreen(
                 
                 AlertDialog(
                     onDismissRequest = { showExpiryDatePicker = false },
-                    title = { Text("Fecha de vencimiento") },
+                    title = { Text("Fecha de vencimiento", color = GreenDark) },
                     text = {
                         android.widget.DatePicker(
                             androidx.compose.ui.platform.LocalContext.current,
@@ -358,12 +376,12 @@ fun AddItemScreen(
                                 showExpiryDatePicker = false
                             }
                         ) {
-                            Text("OK")
+                            Text("OK", color = GreenDark)
                         }
                     },
                     dismissButton = {
                         TextButton(onClick = { showExpiryDatePicker = false }) {
-                            Text("Cancelar")
+                            Text("Cancelar", color = GreenDark)
                         }
                     }
                 )
@@ -426,7 +444,8 @@ fun AddItemScreen(
                     Text(
                         "Guardar alimento",
                         fontSize = 16.sp,
-                        fontWeight = FontWeight.SemiBold
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White
                     )
                 }
             }
