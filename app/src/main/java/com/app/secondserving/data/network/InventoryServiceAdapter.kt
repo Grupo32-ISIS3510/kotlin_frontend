@@ -123,7 +123,7 @@ private fun InventoryItem.toEntity(): FoodItemEntity {
         id = this.id,
         name = this.name,
         category = this.category,
-        quantity = this.quantity,
+        quantity = this.quantity.toInt(),
         purchaseDate = "", // El backend no devuelve purchase_date en la respuesta
         expiryDate = this.expiry_date,
         originalShelfLifeDays = null,

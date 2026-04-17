@@ -1,5 +1,6 @@
 package com.app.secondserving.ui.inventory
 
+import android.app.DatePickerDialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -46,7 +47,7 @@ fun ReviewScanScreen(
     onConfirm: (List<EditableScannedItem>) -> Unit,
     onNavigateBack: () -> Unit
 ) {
-    val defaultDate = detectedPurchaseDate ?: LocalDate.now().toString()
+    val defaultDate = if (!detectedPurchaseDate.isNullOrBlank()) detectedPurchaseDate else LocalDate.now().toString()
     
     var items by remember { 
         mutableStateOf(scannedItems.map { 
@@ -123,7 +124,6 @@ fun ReviewItemCard(
     onDelete: () -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
-    var showDatePicker by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
     val textFieldColors = OutlinedTextFieldDefaults.colors(
@@ -206,7 +206,17 @@ fun ReviewItemCard(
                 label = { Text("Vencimiento estimado", fontSize = 11.sp) },
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                 trailingIcon = {
-                    IconButton(onClick = { showDatePicker = true }) {
+                    IconButton(onClick = {
+                        val dateParts = item.expiryDate.split("-")
+                        val year = dateParts[0].toInt()
+                        val month = dateParts[1].toInt() - 1
+                        val day = dateParts[2].toInt()
+
+                        DatePickerDialog(context, { _, y, m, d ->
+                            val newDate = String.format(Locale.US, "%04d-%02d-%02d", y, m + 1, d)
+                            onUpdate(item.copy(expiryDate = newDate))
+                        }, year, month, day).show()
+                    }) {
                         Icon(Icons.Default.CalendarToday, contentDescription = "Cambiar", tint = GreenDark, modifier = Modifier.size(20.dp))
                     }
                 },
@@ -214,24 +224,5 @@ fun ReviewItemCard(
                 textStyle = LocalTextStyle.current.copy(fontSize = 12.sp)
             )
         }
-    }
-
-    if (showDatePicker) {
-        val dateParts = item.expiryDate.split("-")
-        val currentYear = dateParts[0].toInt()
-        val currentMonth = dateParts[1].toInt() - 1
-        val currentDay = dateParts[2].toInt()
-
-        val datePickerDialog = android.app.DatePickerDialog(
-            context,
-            { _, year, month, day ->
-                val newDate = String.format(Locale.US, "%04d-%02d-%02d", year, month + 1, day)
-                onUpdate(item.copy(expiryDate = newDate))
-                showDatePicker = false
-            },
-            currentYear, currentMonth, currentDay
-        )
-        datePickerDialog.setOnCancelListener { showDatePicker = false }
-        datePickerDialog.show()
     }
 }

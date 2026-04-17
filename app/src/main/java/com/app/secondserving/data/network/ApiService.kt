@@ -29,4 +29,11 @@ interface ApiService {
 
     @POST("notifications/token")
     suspend fun registerFcmToken(@Body body: Map<String, String>): Response<Unit>
+
+    // Recipe Endpoints
+    @GET("recipes")
+    suspend fun getRecipes(): Response<RecipeResponse>
+
+    @POST("recipes/{id}/interact")
+    suspend fun cookRecipe(@Path("id") recipeId: Int): Response<Unit>
 }

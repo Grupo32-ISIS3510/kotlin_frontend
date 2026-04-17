@@ -29,8 +29,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.app.secondserving.data.InventoryRepository
+import com.app.secondserving.data.RecipeRepository
 import com.app.secondserving.data.ScannedItem
 import com.app.secondserving.data.network.InventoryItemRequest
+import com.app.secondserving.data.network.Recipe
 import com.app.secondserving.ui.inventory.AddItemScreen
 import com.app.secondserving.ui.inventory.InventoryItemUi
 import com.app.secondserving.ui.inventory.InventoryScreen
@@ -40,6 +42,10 @@ import com.app.secondserving.ui.inventory.ItemDetailScreen
 import com.app.secondserving.ui.inventory.ScanReceiptScreen
 import com.app.secondserving.ui.inventory.ReviewScanScreen
 import com.app.secondserving.ui.inventory.WeatherViewModel
+import com.app.secondserving.ui.recipes.RecipeDetailScreen
+import com.app.secondserving.ui.recipes.RecipeScreen
+import com.app.secondserving.ui.recipes.RecipeViewModel
+import com.app.secondserving.ui.recipes.RecipeViewModelFactory
 import com.app.secondserving.ui.theme.MyApplicationTheme
 
 class MainActivity : ComponentActivity() {
@@ -69,6 +75,7 @@ fun MyApplicationApp() {
     var showScanReceipt by remember { mutableStateOf(false) }
     var selectedItem by remember { mutableStateOf<InventoryItemUi?>(null) }
     var selectedItemTip by remember { mutableStateOf("") }
+    var selectedRecipe by remember { mutableStateOf<Recipe?>(null) }
     
     // Estado para la pantalla de revisión
     var itemsToReview by remember { mutableStateOf<List<ScannedItem>?>(null) }
@@ -96,13 +103,16 @@ fun MyApplicationApp() {
         )
     )
 
+    val recipeViewModel: RecipeViewModel = viewModel(
+        factory = RecipeViewModelFactory(RecipeRepository())
+    )
+
     // Pantalla de Revisión
     if (itemsToReview != null) {
         ReviewScanScreen(
             scannedItems = itemsToReview!!,
             detectedPurchaseDate = detectedDate,
             onConfirm = { reviewedItems ->
-                // Anti-patrón resuelto: Guardado masivo eficiente
                 val requests = reviewedItems.map { item ->
                     InventoryItemRequest(
                         name = item.name,
@@ -163,6 +173,19 @@ fun MyApplicationApp() {
         return
     }
 
+    if (selectedRecipe != null) {
+        RecipeDetailScreen(
+            recipe = selectedRecipe!!,
+            viewModel = recipeViewModel,
+            onNavigateBack = { 
+                selectedRecipe = null 
+                // Al volver, si se cocinó algo, el inventario debe refrescarse
+                inventoryViewModel.loadInventory()
+            }
+        )
+        return
+    }
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         bottomBar = {
@@ -190,7 +213,12 @@ fun MyApplicationApp() {
                     }
                     NavigationBarItem(
                         selected = currentDestination == destination,
-                        onClick = { currentDestination = destination },
+                        onClick = { 
+                            currentDestination = destination 
+                            if (destination == AppDestinations.RECETAS) {
+                                recipeViewModel.fetchRecipes()
+                            }
+                        },
                         icon = {
                             Icon(destination.icon, contentDescription = destination.label)
                         },
@@ -215,7 +243,12 @@ fun MyApplicationApp() {
                     }
                 )
                 AppDestinations.INICIO -> PlaceholderScreen("Inicio")
-                AppDestinations.RECETAS -> PlaceholderScreen("Recetas")
+                AppDestinations.RECETAS -> RecipeScreen(
+                    viewModel = recipeViewModel,
+                    onRecipeClick = { recipe ->
+                        selectedRecipe = recipe
+                    }
+                )
                 AppDestinations.PERFIL -> PlaceholderScreen("Perfil")
             }
         }

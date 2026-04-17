@@ -21,9 +21,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import com.app.secondserving.data.ShelfLifePredictor
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 private val GreenDark = Color(0xFF386641)
@@ -238,36 +239,31 @@ fun AddItemScreen(
                 singleLine = true
             )
 
-            // Dialog selector de fecha de compra
+            // Selector de fecha de compra (Material 3)
             if (showPurchaseDatePicker) {
-                var selectedYear by rememberSaveable { mutableStateOf(LocalDate.now().year) }
-                var selectedMonth by rememberSaveable { mutableStateOf(LocalDate.now().monthValue - 1) }
-                var selectedDay by rememberSaveable { mutableStateOf(LocalDate.now().dayOfMonth) }
-                
-                AlertDialog(
-                    onDismissRequest = { showPurchaseDatePicker = false },
-                    title = { Text("Fecha de compra", color = GreenDark) },
-                    text = {
-                        android.widget.DatePicker(
-                            androidx.compose.ui.platform.LocalContext.current,
-                            null,
-                            android.R.attr.datePickerStyle
-                        ).apply {
-                            updateDate(selectedYear, selectedMonth, selectedDay)
-                            setOnDateChangedListener { _, year, month, day ->
-                                selectedYear = year
-                                selectedMonth = month
-                                selectedDay = day
-                            }
+                val datePickerState = rememberDatePickerState(
+                    initialSelectedDateMillis = if (purchaseDate.isNotBlank()) {
+                        try {
+                            LocalDate.parse(purchaseDate, DATE_FORMAT)
+                                .atStartOfDay(ZoneId.of("UTC"))
+                                .toInstant()
+                                .toEpochMilli()
+                        } catch (e: Exception) {
+                            null
                         }
-                    },
+                    } else null
+                )
+                DatePickerDialog(
+                    onDismissRequest = { showPurchaseDatePicker = false },
                     confirmButton = {
                         TextButton(
                             onClick = {
-                                val date = String.format("%04d-%02d-%02d", selectedYear, selectedMonth + 1, selectedDay)
-                                purchaseDate = date
-                                purchaseDateError = false
-                                showPredictionTip = false
+                                datePickerState.selectedDateMillis?.let { millis ->
+                                    val date = Instant.ofEpochMilli(millis).atZone(ZoneId.of("UTC")).toLocalDate()
+                                    purchaseDate = date.format(DATE_FORMAT)
+                                    purchaseDateError = false
+                                    showPredictionTip = false
+                                }
                                 showPurchaseDatePicker = false
                             }
                         ) {
@@ -279,7 +275,9 @@ fun AddItemScreen(
                             Text("Cancelar", color = GreenDark)
                         }
                     }
-                )
+                ) {
+                    DatePicker(state = datePickerState)
+                }
             }
 
             // Tip de predicción
@@ -343,36 +341,31 @@ fun AddItemScreen(
                 singleLine = true
             )
 
-            // Dialog selector de fecha de expiración
+            // Selector de fecha de vencimiento (Material 3)
             if (showExpiryDatePicker) {
-                var expYear by rememberSaveable { mutableStateOf(LocalDate.now().year) }
-                var expMonth by rememberSaveable { mutableStateOf(LocalDate.now().monthValue - 1) }
-                var expDay by rememberSaveable { mutableStateOf(LocalDate.now().dayOfMonth) }
-                
-                AlertDialog(
-                    onDismissRequest = { showExpiryDatePicker = false },
-                    title = { Text("Fecha de vencimiento", color = GreenDark) },
-                    text = {
-                        android.widget.DatePicker(
-                            androidx.compose.ui.platform.LocalContext.current,
-                            null,
-                            android.R.attr.datePickerStyle
-                        ).apply {
-                            updateDate(expYear, expMonth, expDay)
-                            setOnDateChangedListener { _, year, month, day ->
-                                expYear = year
-                                expMonth = month
-                                expDay = day
-                            }
+                val datePickerState = rememberDatePickerState(
+                    initialSelectedDateMillis = if (expiryDate.isNotBlank()) {
+                        try {
+                            LocalDate.parse(expiryDate, DATE_FORMAT)
+                                .atStartOfDay(ZoneId.of("UTC"))
+                                .toInstant()
+                                .toEpochMilli()
+                        } catch (e: Exception) {
+                            null
                         }
-                    },
+                    } else null
+                )
+                DatePickerDialog(
+                    onDismissRequest = { showExpiryDatePicker = false },
                     confirmButton = {
                         TextButton(
                             onClick = {
-                                val date = String.format("%04d-%02d-%02d", expYear, expMonth + 1, expDay)
-                                expiryDate = date
-                                expiryDateError = false
-                                showPredictionTip = false
+                                datePickerState.selectedDateMillis?.let { millis ->
+                                    val date = Instant.ofEpochMilli(millis).atZone(ZoneId.of("UTC")).toLocalDate()
+                                    expiryDate = date.format(DATE_FORMAT)
+                                    expiryDateError = false
+                                    showPredictionTip = false
+                                }
                                 showExpiryDatePicker = false
                             }
                         ) {
@@ -384,7 +377,9 @@ fun AddItemScreen(
                             Text("Cancelar", color = GreenDark)
                         }
                     }
-                )
+                ) {
+                    DatePicker(state = datePickerState)
+                }
             }
 
             // Error general
