@@ -73,6 +73,14 @@ class InventoryRepository(
     }
 
     /**
+     * Snapshot one-shot de items que expiran pronto (sin observar la DB).
+     * Usado por el worker diario para no recibir re-emisiones.
+     */
+    suspend fun getExpiringSoonItemsOnce(): List<FoodItemEntity> {
+        return dao.getExpiringSoonItems().first()
+    }
+
+    /**
      * Obtiene items ya expirados.
      */
     fun getExpiredItems(): Flow<List<FoodItemEntity>> {

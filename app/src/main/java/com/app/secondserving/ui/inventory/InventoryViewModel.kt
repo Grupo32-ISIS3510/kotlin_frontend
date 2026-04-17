@@ -3,8 +3,10 @@ package com.app.secondserving.ui.inventory
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.app.secondserving.data.ExpirationNotifier
 import com.app.secondserving.data.InventoryRepository
 import com.app.secondserving.data.Result
+import com.app.secondserving.data.local.FoodItemEntity
 import com.app.secondserving.data.network.InventoryItemRequest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -40,7 +42,10 @@ sealed class AddItemUiState {
     data class Error(val message: String) : AddItemUiState()
 }
 
-class InventoryViewModel(private val repository: InventoryRepository) : ViewModel() {
+class InventoryViewModel(
+    private val repository: InventoryRepository,
+    private val expirationNotifier: ExpirationNotifier? = null
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow<InventoryUiState>(InventoryUiState.Loading)
     val uiState: StateFlow<InventoryUiState> = _uiState.asStateFlow()
@@ -164,6 +169,7 @@ class InventoryViewModel(private val repository: InventoryRepository) : ViewMode
             when (val result = repository.createInventoryItem(request)) {
                 is Result.Success -> {
                     _addItemState.value = AddItemUiState.Success
+                    expirationNotifier?.notifyImmediateExpiration(result.data)
                     loadInventory()
                 }
                 is Result.Error -> {
@@ -182,16 +188,21 @@ class InventoryViewModel(private val repository: InventoryRepository) : ViewMode
             _addItemState.value = AddItemUiState.Loading
             var successCount = 0
             var lastError: Throwable? = null
+            val created = mutableListOf<FoodItemEntity>()
 
             items.forEach { request ->
                 when (val result = repository.createInventoryItem(request)) {
-                    is Result.Success -> successCount++
+                    is Result.Success -> {
+                        successCount++
+                        created += result.data
+                    }
                     is Result.Error -> lastError = result.exception
                 }
             }
 
             if (successCount > 0) {
                 _addItemState.value = AddItemUiState.Success
+                expirationNotifier?.checkAndNotify(created)
                 loadInventory()
             } else if (lastError != null) {
                 _addItemState.value = AddItemUiState.Error(getUserFriendlyMessage(lastError!!))
@@ -206,11 +217,14 @@ class InventoryViewModel(private val repository: InventoryRepository) : ViewMode
     }
 }
 
-class InventoryViewModelFactory(private val repository: InventoryRepository) : ViewModelProvider.Factory {
+class InventoryViewModelFactory(
+    private val repository: InventoryRepository,
+    private val expirationNotifier: ExpirationNotifier? = null
+) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(InventoryViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return InventoryViewModel(repository) as T
+            return InventoryViewModel(repository, expirationNotifier) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

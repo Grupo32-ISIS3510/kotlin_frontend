@@ -30,9 +30,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.core.app.NotificationCompat
-import android.app.NotificationChannel
-import android.app.NotificationManager
 
 private val GreenDark = Color(0xFF386641)
 private val UrgencyRed = Color(0xFFE53935)
@@ -54,6 +51,7 @@ fun InventoryScreen(
     val selectedCategory by viewModel.selectedCategory.collectAsState()
     val weatherState by weatherViewModel.weatherState.collectAsState()
     val context = LocalContext.current
+    var showExpiringSheet by remember { mutableStateOf(false) }
 
     val locationLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -109,43 +107,10 @@ fun InventoryScreen(
                 color = Color.White,
                 shadowElevation = 2.dp
             ) {
-                IconButton(onClick = {
-                    val manager = context.getSystemService(NotificationManager::class.java)
-                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                        val channel = NotificationChannel(
-                            "expiry_alerts",
-                            "Alertas de vencimiento",
-                            NotificationManager.IMPORTANCE_HIGH
-                        )
-                        manager.createNotificationChannel(channel)
-                    }
-
-                    val expiring = if (uiState is InventoryUiState.Success) {
-                        (uiState as InventoryUiState.Success).items
-                            .filter { it.daysRemaining <= 1 }
-                    } else emptyList()
-
-                    val bodyText = if (expiring.isNotEmpty()) {
-                        expiring.joinToString("\n") { item ->
-                            "• ${item.name} — ${if (item.daysRemaining <= 0) "vence hoy" else "1 día restante"}"
-                        }
-                    } else {
-                        "Todos tus alimentos están en buen estado 🎉"
-                    }
-
-                    val notification = NotificationCompat.Builder(context, "expiry_alerts")
-                        .setSmallIcon(android.R.drawable.ic_dialog_info)
-                        .setContentTitle("⚠️ Alimentos próximos a vencer")
-                        .setContentText(bodyText)
-                        .setStyle(NotificationCompat.BigTextStyle().bigText(bodyText))
-                        .setAutoCancel(true)
-                        .build()
-
-                    manager.notify(1001, notification)
-                }) {
+                IconButton(onClick = { showExpiringSheet = true }) {
                     Icon(
                         imageVector = Icons.Default.Notifications,
-                        contentDescription = "Notificaciones",
+                        contentDescription = "Alimentos próximos a vencer",
                         tint = GreenDark
                     )
                 }
@@ -298,6 +263,110 @@ fun InventoryScreen(
                         }
                     }
                 }
+            }
+        }
+    }
+
+    if (showExpiringSheet) {
+        val expiring = (uiState as? InventoryUiState.Success)
+            ?.items
+            ?.filter { it.daysRemaining <= 3 }
+            ?.sortedBy { it.daysRemaining }
+            .orEmpty()
+        ExpiringItemsSheet(
+            items = expiring,
+            onDismiss = { showExpiringSheet = false }
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ExpiringItemsSheet(
+    items: List<InventoryItemUi>,
+    onDismiss: () -> Unit
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(),
+        containerColor = Color.White
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 12.dp)
+        ) {
+            Text(
+                text = "Próximos a vencer",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF1A1A1A)
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = if (items.isEmpty())
+                    "Todos tus alimentos están en buen estado 🎉"
+                else
+                    "${items.size} ${if (items.size == 1) "producto vence" else "productos vencen"} en los próximos 3 días",
+                fontSize = 13.sp,
+                color = Color.Gray
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+
+            if (items.isNotEmpty()) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(bottom = 24.dp)
+                ) {
+                    items.forEach { item -> ExpiringRow(item) }
+                }
+            } else {
+                Spacer(modifier = Modifier.height(24.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun ExpiringRow(item: InventoryItemUi) {
+    val (label, color) = when {
+        item.daysRemaining <= 0L -> "Vence hoy" to UrgencyRed
+        item.daysRemaining == 1L -> "Vence mañana" to UrgencyRed
+        else -> "En ${item.daysRemaining} días" to UrgencyYellow
+    }
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = Color(0xFFF8F8F5),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = item.name,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 15.sp,
+                    color = Color(0xFF1A1A1A)
+                )
+                Text(
+                    text = "${item.quantity} ${if (item.quantity == 1) "unidad" else "unidades"}",
+                    fontSize = 12.sp,
+                    color = Color.Gray
+                )
+            }
+            Surface(
+                shape = RoundedCornerShape(10.dp),
+                color = color
+            ) {
+                Text(
+                    text = label,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                    color = Color.White,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
     }
