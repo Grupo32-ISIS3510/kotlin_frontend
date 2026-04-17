@@ -44,7 +44,12 @@ class RecipeViewModel(private val repository: RecipeRepository) : ViewModel() {
                     if (result.data.isEmpty()) {
                         _uiState.value = RecipesUiState.Empty
                     } else {
-                        _uiState.value = RecipesUiState.Success(result.data)
+                        // T2.3: Ranked list - Sort by score (descending) and then by expiry days (ascending)
+                        val rankedRecipes = result.data.sortedWith(
+                            compareByDescending<Recipe> { it.score ?: 0.0 }
+                                .thenBy { it.soonest_expiry_days ?: Int.MAX_VALUE }
+                        )
+                        _uiState.value = RecipesUiState.Success(rankedRecipes)
                     }
                 }
                 is Result.Error -> {

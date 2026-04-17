@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.RestaurantMenu
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -25,6 +26,7 @@ import com.app.secondserving.data.network.Recipe
 private val GreenDark = Color(0xFF386641)
 private val BackgroundColor = Color(0xFFF5F5F0)
 private val OrangeExpiring = Color(0xFFBC4749)
+private val StarColor = Color(0xFFFFB703)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -95,39 +97,81 @@ fun RecipeCard(recipe: Recipe, onClick: () -> Unit) {
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = recipe.title,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color = GreenDark
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+                Text(
+                    text = recipe.title,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = GreenDark,
+                    modifier = Modifier.weight(1f)
+                )
+                
+                // Smart Score Indicator
+                recipe.score?.let { score ->
+                    Surface(
+                        color = GreenDark.copy(alpha = 0.1f),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.Star,
+                                contentDescription = null,
+                                tint = StarColor,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "${(score * 100).toInt()}%",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = GreenDark
+                            )
+                        }
+                    }
+                }
+            }
             
             Spacer(modifier = Modifier.height(8.dp))
             
             if (recipe.matched_ingredients.isNotEmpty()) {
                 Text(
-                    text = "Ingredientes que tienes: ${recipe.matched_ingredients.joinToString(", ")}",
+                    text = "Aprovecha: ${recipe.matched_ingredients.joinToString(", ")}",
                     fontSize = 14.sp,
                     color = Color.Gray
                 )
             }
 
             recipe.soonest_expiry_days?.let { days ->
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        Icons.Default.Warning,
-                        contentDescription = null,
-                        tint = OrangeExpiring,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "Vence en: $days días",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = OrangeExpiring
-                    )
+                Spacer(modifier = Modifier.height(12.dp))
+                Surface(
+                    color = if (days <= 3) OrangeExpiring.copy(alpha = 0.1f) else Color(0xFFE8F5E9),
+                    shape = RoundedCornerShape(6.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            if (days <= 3) Icons.Default.Warning else Icons.Default.RestaurantMenu,
+                            contentDescription = null,
+                            tint = if (days <= 3) OrangeExpiring else GreenDark,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (days <= 0) "Vence hoy" else "Ingredientes vencen en: $days días",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (days <= 3) OrangeExpiring else GreenDark
+                        )
+                    }
                 }
             }
         }
@@ -155,7 +199,7 @@ fun EmptyRecipesState() {
             color = Color.Gray
         )
         Text(
-            "Agrega más productos a tu inventario para recibir sugerencias.",
+            "Agrega más productos a tu inventario para recibir sugerencias inteligentes basadas en lo que tienes.",
             textAlign = TextAlign.Center,
             color = Color.Gray
         )
@@ -169,7 +213,9 @@ fun ErrorState(message: String, onRetry: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text("Error: $message", color = Color.Red, textAlign = TextAlign.Center)
+        Text("No pudimos cargar las recetas", fontWeight = FontWeight.Bold, color = Color.Gray)
+        Text(message, color = Color.Red.copy(alpha = 0.7f), textAlign = TextAlign.Center, fontSize = 12.sp)
+        Spacer(modifier = Modifier.height(16.dp))
         Button(onClick = onRetry, colors = ButtonDefaults.buttonColors(containerColor = GreenDark)) {
             Text("Reintentar")
         }
