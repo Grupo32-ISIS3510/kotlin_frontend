@@ -1,5 +1,4 @@
 package com.app.secondserving.ui.inventory
-
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -9,8 +8,10 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Search
@@ -49,9 +50,11 @@ fun InventoryScreen(
     val uiState by viewModel.uiState.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val selectedCategory by viewModel.selectedCategory.collectAsState()
+    val expiredItems by viewModel.expiredItems.collectAsState()
     val weatherState by weatherViewModel.weatherState.collectAsState()
     val context = LocalContext.current
     var showExpiringSheet by remember { mutableStateOf(false) }
+    var showExpiredAlert by remember { mutableStateOf(false) }
 
     val locationLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -63,12 +66,18 @@ fun InventoryScreen(
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                viewModel.loadInventory()
+                viewModel.loadInventory(showLoading = false)
                 locationLauncher.launch(android.Manifest.permission.ACCESS_COARSE_LOCATION)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    LaunchedEffect(expiredItems) {
+        if (expiredItems.isNotEmpty() && ExpiredAlertPreferences.shouldShowExpiredAlert(context)) {
+            showExpiredAlert = true
+        }
     }
 
     val itemCount = if (uiState is InventoryUiState.Success) {
@@ -223,43 +232,50 @@ fun InventoryScreen(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        when (val state = uiState) {
-            is InventoryUiState.Loading -> {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = GreenDark)
-                }
-            }
-            is InventoryUiState.Error -> {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("No se pudo cargar el inventario", color = Color.Gray, fontSize = 16.sp)
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Button(
-                            onClick = { viewModel.loadInventory() },
-                            colors = ButtonDefaults.buttonColors(containerColor = GreenDark)
-                        ) { Text("Reintentar") }
-                    }
-                }
-            }
-            is InventoryUiState.Success -> {
-                if (state.items.isEmpty()) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+        ) {
+            when (val state = uiState) {
+                is InventoryUiState.Loading -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("Tu despensa está vacía", color = Color.Gray, fontSize = 16.sp)
+                        CircularProgressIndicator(color = GreenDark)
                     }
-                } else {
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(2),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                        contentPadding = PaddingValues(bottom = 16.dp)
-                    ) {
-                        items(state.items) { item ->
-                            val tip = weatherViewModel.getStorageTip(item.name)
-                            InventoryCard(
-                                item = item,
-                                storageTip = tip,
-                                onClick = { onItemClick(item, tip) }
-                            )
+                }
+                is InventoryUiState.Error -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("No se pudo cargar el inventario", color = Color.Gray, fontSize = 16.sp)
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Button(
+                                onClick = { viewModel.loadInventory() },
+                                colors = ButtonDefaults.buttonColors(containerColor = GreenDark)
+                            ) { Text("Reintentar") }
+                        }
+                    }
+                }
+                is InventoryUiState.Success -> {
+                    if (state.items.isEmpty()) {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text("Tu despensa está vacía", color = Color.Gray, fontSize = 16.sp)
+                        }
+                    } else {
+                        LazyVerticalGrid(
+                            modifier = Modifier.fillMaxSize(),
+                            columns = GridCells.Fixed(2),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            contentPadding = PaddingValues(bottom = 16.dp)
+                        ) {
+                            items(state.items) { item ->
+                                val tip = weatherViewModel.getStorageTip(item.name)
+                                InventoryCard(
+                                    item = item,
+                                    storageTip = tip,
+                                    onClick = { onItemClick(item, tip) }
+                                )
+                            }
                         }
                     }
                 }
@@ -276,6 +292,17 @@ fun InventoryScreen(
         ExpiringItemsSheet(
             items = expiring,
             onDismiss = { showExpiringSheet = false }
+        )
+    }
+
+    if (showExpiredAlert) {
+        ExpiredItemsAlert(
+            items = expiredItems,
+            onHideForToday = {
+                ExpiredAlertPreferences.hideExpiredAlertFor24Hours(context)
+                showExpiredAlert = false
+            },
+            onDismiss = { showExpiredAlert = false }
         )
     }
 }
@@ -330,7 +357,8 @@ private fun ExpiringItemsSheet(
 @Composable
 private fun ExpiringRow(item: InventoryItemUi) {
     val (label, color) = when {
-        item.daysRemaining <= 0L -> "Vence hoy" to UrgencyRed
+        item.daysRemaining < 0L -> "Vencido hace ${kotlin.math.abs(item.daysRemaining)} días" to UrgencyRed
+        item.daysRemaining == 0L -> "Vence hoy" to UrgencyRed
         item.daysRemaining == 1L -> "Vence mañana" to UrgencyRed
         else -> "En ${item.daysRemaining} días" to UrgencyYellow
     }
@@ -373,6 +401,63 @@ private fun ExpiringRow(item: InventoryItemUi) {
 }
 
 @Composable
+private fun ExpiredItemsAlert(
+    items: List<InventoryItemUi>,
+    onHideForToday: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    if (items.isEmpty()) return
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Tienes productos vencidos",
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 320.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Text(
+                    text = "Revisa estos productos para evitar riesgos de consumo:",
+                    fontSize = 13.sp,
+                    color = Color.Gray
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                items.forEach { item ->
+                    val status = if (item.daysRemaining == 0L) {
+                        "vence hoy"
+                    } else {
+                        "vencido hace ${kotlin.math.abs(item.daysRemaining)} días"
+                    }
+                    Text(
+                        text = "• ${item.name}: $status",
+                        fontSize = 14.sp,
+                        color = Color(0xFF1A1A1A)
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Entendido", color = GreenDark)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onHideForToday) {
+                Text("No volver a mostrar hoy", color = Color.Gray)
+            }
+        }
+    )
+}
+
+@Composable
 private fun InventoryCard(
     item: InventoryItemUi,
     storageTip: String,
@@ -383,7 +468,11 @@ private fun InventoryCard(
         Urgency.YELLOW -> UrgencyYellow
         Urgency.GREEN -> UrgencyGreen
     }
-    val daysLabel = if (item.daysRemaining == 1L) "1 DÍA" else "${maxOf(0, item.daysRemaining)} DÍAS"
+    val daysLabel = when {
+        item.daysRemaining < 0L -> "VENCIDO"
+        item.daysRemaining == 1L -> "1 DÍA"
+        else -> "${maxOf(0, item.daysRemaining)} DÍAS"
+    }
     val progress = (maxOf(0L, item.daysRemaining) / 14f).coerceIn(0f, 1f)
 
     Card(

@@ -1,14 +1,17 @@
 package com.app.secondserving
 
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -41,8 +44,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.app.secondserving.data.InventoryRepository
 import com.app.secondserving.data.ScannedItem
+import com.app.secondserving.data.SessionManager
 import com.app.secondserving.data.network.InventoryItemRequest
 import com.app.secondserving.ui.inventory.AddItemScreen
+import com.app.secondserving.ui.inventory.ExpiredAlertPreferences
 import com.app.secondserving.ui.inventory.InventoryItemUi
 import com.app.secondserving.ui.inventory.InventoryScreen
 import com.app.secondserving.ui.inventory.InventoryViewModel
@@ -51,6 +56,7 @@ import com.app.secondserving.ui.inventory.ItemDetailScreen
 import com.app.secondserving.ui.inventory.ScanReceiptScreen
 import com.app.secondserving.ui.inventory.ReviewScanScreen
 import com.app.secondserving.ui.inventory.WeatherViewModel
+import com.app.secondserving.ui.login.LoginActivity
 import com.app.secondserving.ui.theme.MyApplicationTheme
 
 class MainActivity : ComponentActivity() {
@@ -78,6 +84,8 @@ fun MyApplicationApp() {
     var currentDestination by rememberSaveable { mutableStateOf(AppDestinations.DESPENSA) }
     var showAddItem by remember { mutableStateOf(false) }
     var showScanReceipt by remember { mutableStateOf(false) }
+    var showLogoutDialog by remember { mutableStateOf(false) }
+    var showPreferencesDialog by remember { mutableStateOf(false) }
     var selectedItem by remember { mutableStateOf<InventoryItemUi?>(null) }
     var selectedItemTip by remember { mutableStateOf("") }
     
@@ -107,6 +115,39 @@ fun MyApplicationApp() {
             app?.expirationNotifier
         )
     )
+
+    val performLogout = {
+        SessionManager(context).clearSession()
+        val intent = Intent(context, LoginActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        }
+        context.startActivity(intent)
+        (context as? ComponentActivity)?.finish()
+    }
+
+    BackHandler(
+        enabled = selectedItem != null ||
+            itemsToReview != null ||
+            showScanReceipt ||
+            showAddItem ||
+            currentDestination != AppDestinations.DESPENSA
+    ) {
+        when {
+            selectedItem != null -> selectedItem = null
+            itemsToReview != null -> {
+                itemsToReview = null
+                showScanReceipt = true
+            }
+            showScanReceipt -> {
+                showScanReceipt = false
+                showAddItem = true
+            }
+            showAddItem -> showAddItem = false
+            currentDestination != AppDestinations.DESPENSA -> {
+                currentDestination = AppDestinations.DESPENSA
+            }
+        }
+    }
 
     // Pantalla de Revisión
     if (itemsToReview != null) {
@@ -228,9 +269,60 @@ fun MyApplicationApp() {
                 )
                 AppDestinations.INICIO -> WelcomeScreen()
                 AppDestinations.RECETAS -> PlaceholderScreen("Recetas")
-                AppDestinations.PERFIL -> ProfileScreen()
+                AppDestinations.PERFIL -> ProfileScreen(
+                    onOpenPreferences = { showPreferencesDialog = true },
+                    onLogout = { showLogoutDialog = true }
+                )
             }
         }
+    }
+
+    if (showPreferencesDialog) {
+        AlertDialog(
+            onDismissRequest = { showPreferencesDialog = false },
+            title = { Text("Preferencias") },
+            text = {
+                Text("Si seleccionas esta opción, el aviso de productos vencidos se mostrará siempre al entrar al inventario (se desactiva el \"no mostrar hoy\").")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        ExpiredAlertPreferences.resetExpiredAlertVisibility(context)
+                        showPreferencesDialog = false
+                    }
+                ) {
+                    Text("Activar: volver a mostrar siempre", color = Color(0xFF386641))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showPreferencesDialog = false }) {
+                    Text("Cerrar")
+                }
+            }
+        )
+    }
+
+    if (showLogoutDialog) {
+        AlertDialog(
+            onDismissRequest = { showLogoutDialog = false },
+            title = { Text("Cerrar sesión") },
+            text = { Text("¿Seguro que quieres cerrar sesión?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showLogoutDialog = false
+                        performLogout()
+                    }
+                ) {
+                    Text("Cerrar sesión", color = Color(0xFFB71C1C))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showLogoutDialog = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
     }
 }
 
@@ -242,12 +334,18 @@ private fun PlaceholderScreen(name: String) {
 }
 
 @Composable
-private fun ProfileScreen() {
+private fun ProfileScreen(
+    onOpenPreferences: () -> Unit,
+    onLogout: () -> Unit
+) {
+    val context = LocalContext.current
+    val sessionManager = remember(context) { SessionManager(context) }
     val greenDark = Color(0xFF386641)
     val greenLight = Color(0xFFE8F5E9)
     val background = Color(0xFFF5F5F0)
-    val email = "grupo@32kt.com"
-    val initial = email.first().uppercase()
+    val fullName = sessionManager.getFullName().orEmpty().ifBlank { "Usuario" }
+    val email = sessionManager.getEmail().orEmpty().ifBlank { "Sin correo registrado" }
+    val initial = fullName.first().uppercase()
 
     Column(
         modifier = Modifier
@@ -291,7 +389,7 @@ private fun ProfileScreen() {
                 }
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = "Grupo 32kt",
+                    text = fullName,
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFF1A1A1A)
@@ -308,10 +406,19 @@ private fun ProfileScreen() {
                 Spacer(modifier = Modifier.height(24.dp))
 
                 ProfileOptionRow(label = "Notificaciones", greenDark = greenDark)
-                ProfileOptionRow(label = "Preferencias", greenDark = greenDark)
+                ProfileOptionRow(
+                    label = "Preferencias",
+                    greenDark = greenDark,
+                    onClick = onOpenPreferences
+                )
                 ProfileOptionRow(label = "Ayuda y soporte", greenDark = greenDark)
                 ProfileOptionRow(label = "Acerca de", greenDark = greenDark)
-                ProfileOptionRow(label = "Cerrar sesión", greenDark = greenDark, isDestructive = true)
+                ProfileOptionRow(
+                    label = "Cerrar sesión",
+                    greenDark = greenDark,
+                    isDestructive = true,
+                    onClick = onLogout
+                )
             }
         }
     }
@@ -364,12 +471,14 @@ private fun androidx.compose.foundation.layout.RowScope.StatCard(
 private fun ProfileOptionRow(
     label: String,
     greenDark: Color,
-    isDestructive: Boolean = false
+    isDestructive: Boolean = false,
+    onClick: () -> Unit = {}
 ) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp),
+            .padding(vertical = 4.dp)
+            .clickable(onClick = onClick),
         shape = RoundedCornerShape(12.dp),
         color = Color(0xFFF8F8F5)
     ) {

@@ -57,6 +57,8 @@ class InventoryViewModel(
     val selectedCategory: StateFlow<String> = _selectedCategory.asStateFlow()
 
     private val _allItems = MutableStateFlow<List<InventoryItemUi>>(emptyList())
+    private val _expiredItems = MutableStateFlow<List<InventoryItemUi>>(emptyList())
+    val expiredItems: StateFlow<List<InventoryItemUi>> = _expiredItems.asStateFlow()
     private val _addItemState = MutableStateFlow<AddItemUiState>(AddItemUiState.Idle)
     val addItemState: StateFlow<AddItemUiState> = _addItemState.asStateFlow()
 
@@ -89,17 +91,19 @@ class InventoryViewModel(
         return current
     }
 
-    fun loadInventory() {
+    fun loadInventory(forceRefresh: Boolean = false, showLoading: Boolean = true) {
         viewModelScope.launch {
-            _uiState.value = InventoryUiState.Loading
-            when (val result = repository.getInventory()) {
+            if (showLoading || _uiState.value !is InventoryUiState.Success) {
+                _uiState.value = InventoryUiState.Loading
+            }
+            when (val result = repository.getInventory(forceRefresh = forceRefresh)) {
                 is Result.Success -> {
                     val today = LocalDate.now()
                     _allItems.value = result.data.map { item ->
                         val daysRemaining = try {
                             val expiry = LocalDate.parse(item.expiryDate)
                             ChronoUnit.DAYS.between(today, expiry)
-                        } catch (e: DateTimeParseException) {
+                                } catch (e: DateTimeParseException) {
                             0L
                         }
                         val urgency = when {
@@ -116,9 +120,13 @@ class InventoryViewModel(
                             urgency = urgency
                         )
                     }
+                    _expiredItems.value = _allItems.value
+                        .filter { it.daysRemaining <= 0L }
+                        .sortedBy { it.daysRemaining }
                     applyFilters()
                 }
                 is Result.Error -> {
+                    _expiredItems.value = emptyList()
                     _uiState.value = InventoryUiState.Error(getUserFriendlyMessage(result.exception))
                 }
             }

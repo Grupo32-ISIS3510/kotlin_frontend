@@ -11,6 +11,7 @@
     <string name="login_failed">Login failed. Please check your credentials.</string>
     <string name="register_failed">Registration failed. Please try again.</string>
     <string name="invalid_name">Name cannot be empty</string>
+    <string name="invalid_name_length">Name can have at most 60 characters</string>
     <string name="forgot_password">Forgot password?</string>
     <string name="action_register">Sign up</string>
     <string name="welcome_new">Account created successfully!</string>

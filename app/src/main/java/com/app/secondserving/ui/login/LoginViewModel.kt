@@ -12,6 +12,9 @@ import kotlinx.coroutines.launch
 import com.app.secondserving.R
 
 class LoginViewModel(private val loginRepository: LoginRepository) : ViewModel() {
+    companion object {
+        const val MAX_FULL_NAME_LENGTH = 60
+    }
 
     private val _loginForm = MutableLiveData<LoginFormState>()
     val loginFormState: LiveData<LoginFormState> = _loginForm
@@ -24,8 +27,9 @@ class LoginViewModel(private val loginRepository: LoginRepository) : ViewModel()
             val result = loginRepository.login(username, password)
             if (result is Result.Success) {
                 _loginResult.value = LoginResult(success = result.data.toView())
-            } else {
-                _loginResult.value = LoginResult(error = R.string.login_failed)
+            } else if (result is Result.Error) {
+                val errorMessage = result.exception.message ?: getStringFromRes(R.string.login_failed)
+                _loginResult.value = LoginResult(error = errorMessage)
             }
         }
     }
@@ -35,8 +39,13 @@ class LoginViewModel(private val loginRepository: LoginRepository) : ViewModel()
             val result = loginRepository.register(email, fullName, password)
             if (result is Result.Success) {
                 _loginResult.value = LoginResult(success = result.data.toView())
-            } else {
-                _loginResult.value = LoginResult(error = R.string.register_failed)
+            } else if (result is Result.Error) {
+                val errorMessage = result.exception.message ?: getStringFromRes(R.string.register_failed)
+                if (isEmailConflictError(errorMessage)) {
+                    _loginResult.value = LoginResult(emailError = errorMessage)
+                } else {
+                    _loginResult.value = LoginResult(error = errorMessage)
+                }
             }
         }
     }
@@ -56,6 +65,8 @@ class LoginViewModel(private val loginRepository: LoginRepository) : ViewModel()
             _loginForm.value = LoginFormState(usernameError = R.string.invalid_username)
         } else if (fullName.isBlank()) {
             _loginForm.value = LoginFormState(nameError = R.string.invalid_name)
+        } else if (fullName.length > MAX_FULL_NAME_LENGTH) {
+            _loginForm.value = LoginFormState(nameError = R.string.invalid_name_length)
         } else if (!isPasswordValid(password)) {
             _loginForm.value = LoginFormState(passwordError = R.string.invalid_password)
         } else {
@@ -69,6 +80,23 @@ class LoginViewModel(private val loginRepository: LoginRepository) : ViewModel()
 
     private fun isPasswordValid(password: String): Boolean {
         return password.length > 5
+    }
+
+    private fun getStringFromRes(resId: Int): String {
+        return when (resId) {
+            R.string.login_failed -> "Login failed. Please check your credentials."
+            R.string.register_failed -> "Registration failed. Please try again."
+            else -> "Unexpected error"
+        }
+    }
+
+    private fun isEmailConflictError(message: String): Boolean {
+        val normalized = message.lowercase()
+        val mentionsEmail = normalized.contains("email") || normalized.contains("correo")
+        val isAlreadyUsed = normalized.contains("existe") ||
+            normalized.contains("registrad") ||
+            normalized.contains("already")
+        return mentionsEmail && isAlreadyUsed
     }
 
     private fun com.app.secondserving.data.model.LoggedInUser.toView() = LoggedInUserView(

@@ -9,7 +9,8 @@ import retrofit2.converter.gson.GsonConverterFactory
 object RetrofitClient {
 
     // Para celular físico usa: "http://192.168.100.117:8000/api/v1/"
-    private const val BASE_URL = "http://3.16.198.192/api/v1/"
+    private const val BASE_URL = "http://3.16.198.192" +
+            "/api/v1/"
 
     private val logging = HttpLoggingInterceptor().apply {
         level = HttpLoggingInterceptor.Level.BODY
