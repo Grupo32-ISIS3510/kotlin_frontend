@@ -1,4 +1,4 @@
-package com.app.secondserving.data
+package com.app.secondserving.data.scan
 
 import android.content.Context
 import android.graphics.Bitmap

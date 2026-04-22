@@ -11,7 +11,7 @@ class InventoryDataSource {
         return try {
             val response = RetrofitClient.authInstance.getInventory()
             if (response.isSuccessful && response.body() != null) {
-                Result.Success(response.body()!!.items)
+                Result.Success(response.body()!!)
             } else {
                 Result.Error(IOException("Error fetching inventory: ${response.code()} ${response.message()}"))
             }
