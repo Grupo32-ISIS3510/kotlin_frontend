@@ -19,6 +19,17 @@ object RetrofitClient {
         .addInterceptor(logging)
         .build()
 
+    // Cliente específico para Edamam con el Header requerido
+    private val edamamClient = OkHttpClient.Builder()
+        .addInterceptor(logging)
+        .addInterceptor { chain ->
+            val request = chain.request().newBuilder()
+                .addHeader("Edamam-Account-User", "arnulfo_user")
+                .build()
+            chain.proceed(request)
+        }
+        .build()
+
     // Cliente sin autenticación — login y register
     val publicInstance: ApiService by lazy {
         Retrofit.Builder()
@@ -34,7 +45,7 @@ object RetrofitClient {
         Retrofit.Builder()
             .baseUrl(EDAMAM_BASE_URL)
             .addConverterFactory(GsonConverterFactory.create())
-            .client(baseClient)
+            .client(edamamClient) // Usamos el cliente con el header
             .build()
             .create(EdamamService::class.java)
     }

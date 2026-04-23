@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.abs
 
 private val GreenDark = Color(0xFF386641)
 private val BackgroundColor = Color(0xFFF5F5F0)
@@ -34,7 +35,12 @@ fun ItemDetailScreen(
         Urgency.YELLOW -> UrgencyYellow
         Urgency.GREEN -> UrgencyGreen
     }
-    val daysLabel = if (item.daysRemaining == 1L) "1 día" else "${maxOf(0, item.daysRemaining)} días"
+    val daysLabel = when {
+        item.daysRemaining < 0L -> "Vencido hace ${abs(item.daysRemaining)} días"
+        item.daysRemaining == 0L -> "Vence hoy"
+        item.daysRemaining == 1L -> "Vence mañana"
+        else -> "Vence en ${item.daysRemaining} días"
+    }
 
     Scaffold(
         topBar = {
@@ -102,7 +108,7 @@ fun ItemDetailScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("Vence en", color = Color.Gray, fontSize = 14.sp)
+                        Text("Estado", color = Color.Gray, fontSize = 14.sp)
                         Surface(
                             shape = RoundedCornerShape(8.dp),
                             color = urgencyColor

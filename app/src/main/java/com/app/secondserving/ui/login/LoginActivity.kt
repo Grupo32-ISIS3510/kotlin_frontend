@@ -5,6 +5,7 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.os.Bundle
 import android.text.Editable
+import android.text.InputFilter
 import android.text.TextWatcher
 import android.view.View
 import android.view.inputmethod.EditorInfo
@@ -13,8 +14,6 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
-import android.widget.Toast
-import androidx.annotation.StringRes
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
@@ -44,6 +43,9 @@ class LoginActivity : AppCompatActivity() {
     private lateinit var loadingBar: ProgressBar
     private lateinit var emailField: EditText
     private lateinit var passwordField: EditText
+    private lateinit var authErrorText: TextView
+    private var emailUnderline: View? = null
+    private var emailServerErrorText: TextView? = null
 
     private var isRegisterMode = false
 
@@ -76,10 +78,14 @@ class LoginActivity : AppCompatActivity() {
         loadingBar         = binding.loading
         emailField         = binding.username
         passwordField      = binding.password
+        authErrorText      = binding.authErrorText
+        emailUnderline     = binding.root.findViewById(R.id.emailUnderline)
+        emailServerErrorText = binding.root.findViewById(R.id.emailServerErrorText)
 
         loginViewModel = ViewModelProvider(this, LoginViewModelFactory())
             .get(LoginViewModel::class.java)
 
+        fullNameField.filters = arrayOf(InputFilter.LengthFilter(LoginViewModel.MAX_FULL_NAME_LENGTH))
         setupTabSwitching()
         setupFormObservers()
         setupInputListeners()
@@ -106,6 +112,8 @@ class LoginActivity : AppCompatActivity() {
             fullNameUnderline.visibility = View.GONE
             forgotPassword.visibility = View.VISIBLE
             loginButton.text = getString(R.string.action_sign_in)
+            clearAuthError()
+            clearEmailBackendError()
 
             loginViewModel.loginDataChanged(
                 emailField.text.toString(),
@@ -129,6 +137,8 @@ class LoginActivity : AppCompatActivity() {
             fullNameUnderline.visibility = View.VISIBLE
             forgotPassword.visibility = View.GONE
             loginButton.text = getString(R.string.action_register)
+            clearAuthError()
+            clearEmailBackendError()
 
             loginViewModel.registerDataChanged(
                 emailField.text.toString(),
@@ -145,13 +155,20 @@ class LoginActivity : AppCompatActivity() {
             emailField.error = if (state.usernameError != null) getString(state.usernameError) else null
             passwordField.error = if (state.passwordError != null) getString(state.passwordError) else null
             fullNameField.error = if (state.nameError != null) getString(state.nameError) else null
+            if (state.usernameError != null) {
+                clearEmailBackendError()
+            }
         })
 
         loginViewModel.loginResult.observe(this, Observer {
             val result = it ?: return@Observer
             loadingBar.visibility = View.GONE
+            clearEmailBackendError()
             if (result.error != null) {
                 showError(result.error)
+            }
+            if (result.emailError != null) {
+                showEmailFieldError(result.emailError)
             }
             if (result.success != null) {
                 sessionManager.saveSession(
@@ -160,11 +177,7 @@ class LoginActivity : AppCompatActivity() {
                     email = result.success.email,
                     userId = result.success.userId
                 )
-                val welcomeMsg = if (isRegisterMode)
-                    getString(R.string.welcome_new)
-                else
-                    "${getString(R.string.welcome)} ${result.success.displayName}"
-                Toast.makeText(applicationContext, welcomeMsg, Toast.LENGTH_LONG).show()
+                clearAuthError()
 
                 startActivity(Intent(this, MainActivity::class.java))
                 finish()
@@ -187,11 +200,15 @@ class LoginActivity : AppCompatActivity() {
     private fun setupActionButton() {
         loginButton.setOnClickListener {
             loadingBar.visibility = View.VISIBLE
+            clearAuthError()
+            clearEmailBackendError()
             submitForm()
         }
     }
 
     private fun notifyFormChanged() {
+        clearAuthError()
+        clearEmailBackendError()
         val email = emailField.text.toString()
         val password = passwordField.text.toString()
         if (isRegisterMode) {
@@ -211,8 +228,28 @@ class LoginActivity : AppCompatActivity() {
         }
     }
 
-    private fun showError(@StringRes errorString: Int) {
-        Toast.makeText(applicationContext, errorString, Toast.LENGTH_SHORT).show()
+    private fun showError(errorMessage: String) {
+        authErrorText.text = errorMessage
+        authErrorText.visibility = View.VISIBLE
+        authErrorText.setTextColor(getColor(R.color.error_red))
+    }
+
+    private fun showEmailFieldError(errorMessage: String) {
+        authErrorText.visibility = View.GONE
+        emailServerErrorText?.text = errorMessage
+        emailServerErrorText?.visibility = View.VISIBLE
+        emailUnderline?.setBackgroundColor(getColor(R.color.error_red))
+    }
+
+    private fun clearEmailBackendError() {
+        emailServerErrorText?.visibility = View.GONE
+        emailServerErrorText?.text = ""
+        emailUnderline?.setBackgroundColor(getColor(R.color.divider))
+    }
+
+    private fun clearAuthError() {
+        authErrorText.visibility = View.GONE
+        authErrorText.text = ""
     }
 }
 

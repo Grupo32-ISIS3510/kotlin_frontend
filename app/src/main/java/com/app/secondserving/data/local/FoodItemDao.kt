@@ -56,4 +56,7 @@ interface FoodItemDao {
 
     @Query("SELECT COUNT(*) FROM food_items")
     fun getItemCount(): Flow<Int>
+
+    @Query("SELECT MAX(updatedAt) FROM food_items")
+    suspend fun getLatestUpdateTimestamp(): Long?
 }

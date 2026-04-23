@@ -5,5 +5,6 @@ package com.app.secondserving.ui.login
  */
 data class LoginResult(
     val success: LoggedInUserView? = null,
-    val error: Int? = null
+    val error: String? = null,
+    val emailError: String? = null
 )

@@ -20,15 +20,19 @@ class WeatherService(context: Context) {
         context.getSharedPreferences("weather_cache", Context.MODE_PRIVATE)
 
     private val apiKey = "fce5b8c63439b7718b2389e3511105db"
-    private val cacheTimeMs = 60 * 60 * 1000L // 1 hora
+    private val cacheTimeMs = 24 * 60 * 60 * 1000L // 24 horas
+
+    fun getCachedWeatherIfFresh(): WeatherInfo? {
+        val cachedTime = prefs.getLong("cache_time", 0)
+        val isFresh = System.currentTimeMillis() - cachedTime < cacheTimeMs
+        if (!isFresh) return null
+        val cached = prefs.getString("cache_data", null) ?: return null
+        return parseWeather(cached)
+    }
 
     suspend fun getWeather(lat: Double, lon: Double): WeatherInfo? {
         // Revisar cache primero
-        val cachedTime = prefs.getLong("cache_time", 0)
-        if (System.currentTimeMillis() - cachedTime < cacheTimeMs) {
-            val cached = prefs.getString("cache_data", null)
-            if (cached != null) return parseWeather(cached)
-        }
+        getCachedWeatherIfFresh()?.let { return it }
 
         return withContext(Dispatchers.IO) {
             try {

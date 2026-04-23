@@ -129,6 +129,18 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toBottomOf="@id/tabContainer"/>
 
+    <TextView
+        android:id="@+id/authErrorText"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:textColor="@color/error_red"
+        android:textSize="13sp"
+        android:visibility="gone"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/tabDivider" />
+
     <!-- ══════════════ FULL NAME (solo Sign-up) ══════════════ -->
     <TextView
         android:id="@+id/labelFullName"
@@ -137,11 +149,11 @@
         android:text="Full name"
         android:textColor="@color/text_gray"
         android:textSize="12sp"
-        android:layout_marginTop="32dp"
+        android:layout_marginTop="20dp"
         android:visibility="gone"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/tabDivider"/>
+        app:layout_constraintTop_toBottomOf="@id/authErrorText"/>
 
     <EditText
         android:id="@+id/fullName"
@@ -149,6 +161,7 @@
         android:layout_height="wrap_content"
         android:hint="Jane Doe"
         android:inputType="textPersonName"
+        android:maxLength="60"
         android:selectAllOnFocus="true"
         android:background="@null"
         android:paddingTop="6dp"
@@ -210,6 +223,18 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toBottomOf="@id/username"/>
 
+    <TextView
+        android:id="@+id/emailServerErrorText"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:textColor="@color/error_red"
+        android:textSize="12sp"
+        android:visibility="gone"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/emailUnderline" />
+
     <!-- ══════════════ PASSWORD ══════════════ -->
     <TextView
         android:id="@+id/labelPassword"
@@ -221,7 +246,7 @@
         android:layout_marginTop="24dp"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/emailUnderline"/>
+        app:layout_constraintTop_toBottomOf="@id/emailServerErrorText"/>
 
     <EditText
         android:id="@+id/password"

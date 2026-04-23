@@ -19,6 +19,9 @@ class InventoryRepository(
     private val database: AppDatabase,
     private val serviceAdapter: InventoryServiceAdapter = InventoryServiceAdapter()
 ) {
+    companion object {
+        private const val INVENTORY_CACHE_TTL_MS = 24 * 60 * 60 * 1000L
+    }
 
     private val dao: FoodItemDao = database.foodItemDao()
 
@@ -27,24 +30,28 @@ class InventoryRepository(
      * Estrategia: Primero intenta obtener del backend, luego guarda en caché local.
      * Si falla la red, devuelve datos locales.
      */
-    suspend fun getInventory(): Result<List<FoodItemEntity>> {
+    suspend fun getInventory(forceRefresh: Boolean = false): Result<List<FoodItemEntity>> {
         return try {
-            // Intentar obtener del backend
+            val localItems = dao.getAllItems().first()
+            val latestUpdate = dao.getLatestUpdateTimestamp() ?: 0L
+            val cacheIsFresh = localItems.isNotEmpty() &&
+                (System.currentTimeMillis() - latestUpdate) < INVENTORY_CACHE_TTL_MS
+
+            // Si el caché local sigue fresco y no se pidió refresh forzado, evitamos llamada de red.
+            if (!forceRefresh && cacheIsFresh) {
+                return Result.Success(localItems)
+            }
+
             val remoteResult = serviceAdapter.getInventory()
             when (remoteResult) {
                 is Result.Success -> {
-                    // Guardar en caché local
+                    // Reemplazamos caché local para mantener consistencia con backend.
+                    dao.deleteAllItems()
                     dao.insertAllItems(remoteResult.data)
-                    remoteResult
+                    Result.Success(remoteResult.data)
                 }
                 is Result.Error -> {
-                    // Fallback a datos locales
-                    val localItems = dao.getAllItems().first()
-                    if (localItems.isNotEmpty()) {
-                        Result.Success(localItems)
-                    } else {
-                        remoteResult
-                    }
+                    if (localItems.isNotEmpty()) Result.Success(localItems) else remoteResult
                 }
             }
         } catch (e: Exception) {
@@ -163,6 +170,6 @@ class InventoryRepository(
      * Útil para refresh manual o al iniciar la app.
      */
     suspend fun syncInventory(): Result<List<FoodItemEntity>> {
-        return getInventory()
+        return getInventory(forceRefresh = true)
     }
 }

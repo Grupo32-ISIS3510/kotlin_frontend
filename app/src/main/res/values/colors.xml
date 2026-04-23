@@ -11,6 +11,7 @@
     <color name="black">#FF000000</color>
     <color name="text_dark">#FF1A1A1A</color>
     <color name="text_gray">#FF888888</color>
+    <color name="error_red">#FFB00020</color>
     <color name="divider">#FFD5D5D5</color>
     <color name="button_disabled">#FFCCCCCC</color>
 </resources>

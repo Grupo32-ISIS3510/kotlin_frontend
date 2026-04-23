@@ -33,6 +33,11 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
     val weatherState: StateFlow<WeatherUiState> = _weatherState.asStateFlow()
 
     fun loadWeather() {
+        weatherService.getCachedWeatherIfFresh()?.let { cached ->
+            _weatherState.value = WeatherUiState.Success(cached)
+            return
+        }
+
         val hasPermission = ContextCompat.checkSelfPermission(
             getApplication(),
             android.Manifest.permission.ACCESS_COARSE_LOCATION
