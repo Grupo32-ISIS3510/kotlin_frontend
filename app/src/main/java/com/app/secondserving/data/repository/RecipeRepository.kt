@@ -20,6 +20,7 @@ class RecipeRepository(
     // Credenciales de Edamam
     private val EDAMAM_APP_ID = "21d09eba"
     private val EDAMAM_APP_KEY = "73941ebfcc612661590a8a7725bf367b"
+    private val EDAMAM_USER_ID = "arnulfo_user" // Identificador para el header Edamam-Account-User
 
     suspend fun getRecommendedRecipes(): Result<List<Recipe>> {
         return try {
@@ -33,12 +34,13 @@ class RecipeRepository(
             val response = edamamService.searchRecipes(
                 query = searchTerms,
                 appId = EDAMAM_APP_ID,
-                appKey = EDAMAM_APP_KEY
+                appKey = EDAMAM_APP_KEY,
+                userId = EDAMAM_USER_ID
             )
 
             if (response.isSuccessful) {
-                val edamamRecipes = response.body()?.hits?.map { hit ->
-                    mapEdamamToRecipe(hit.recipe, inventory.map { it.name })
+                val edamamRecipes = response.body()?.hits?.mapNotNull { hit ->
+                    hit.recipe?.let { mapEdamamToRecipe(it, inventory.map { it.name }) }
                 } ?: emptyList()
                 
                 Result.Success(edamamRecipes)
@@ -48,16 +50,17 @@ class RecipeRepository(
                 val fallbackResponse = edamamService.searchRecipes(
                     query = fallbackQuery,
                     appId = EDAMAM_APP_ID,
-                    appKey = EDAMAM_APP_KEY
+                    appKey = EDAMAM_APP_KEY,
+                    userId = EDAMAM_USER_ID
                 )
                 
                 if (fallbackResponse.isSuccessful) {
-                    val fallbackRecipes = fallbackResponse.body()?.hits?.map { hit ->
-                        mapEdamamToRecipe(hit.recipe, inventory.map { it.name })
+                    val fallbackRecipes = fallbackResponse.body()?.hits?.mapNotNull { hit ->
+                        hit.recipe?.let { mapEdamamToRecipe(it, inventory.map { it.name }) }
                     } ?: emptyList()
                     Result.Success(fallbackRecipes)
                 } else {
-                    Result.Error(IOException("Error Edamam: ${response.code()}"))
+                    Result.Error(IOException("Error Edamam: ${response.code()} ${response.errorBody()?.string()}"))
                 }
             }
         } catch (e: Exception) {
@@ -67,22 +70,23 @@ class RecipeRepository(
 
     private fun mapEdamamToRecipe(er: EdamamRecipe, userIngredients: List<String>): Recipe {
         val matchedIngredients = mutableListOf<String>()
-        val ingredients = er.ingredients.map { ei ->
-            if (userIngredients.any { it.contains(ei.food, ignoreCase = true) || ei.food.contains(it, ignoreCase = true) }) {
-                matchedIngredients.add(ei.food)
+        val ingredients = er.ingredients?.map { ei ->
+            val foodName = ei.food ?: ""
+            if (userIngredients.any { it.contains(foodName, ignoreCase = true) || foodName.contains(it, ignoreCase = true) }) {
+                matchedIngredients.add(foodName)
             }
             RecipeIngredient(
-                name = ei.food,
-                quantity = ei.quantity.toString(),
+                name = foodName,
+                quantity = ei.quantity?.toString() ?: "",
                 unit = ei.measure
             )
-        }
+        } ?: emptyList()
 
         return Recipe(
-            id = er.uri.hashCode(),
-            title = er.label,
+            id = er.uri?.hashCode() ?: 0,
+            title = er.label ?: "Sin título",
             description = er.cuisineType?.firstOrNull() ?: er.dishType?.firstOrNull(),
-            instructions = "Ver receta completa en: ${er.url}\n\nIngredientes necesarios:\n" + er.ingredientLines.joinToString("\n"),
+            instructions = "Ver receta completa en: ${er.url}\n\nIngredientes necesarios:\n" + (er.ingredientLines?.joinToString("\n") ?: ""),
             ingredients = ingredients,
             matched_ingredients = matchedIngredients,
             soonest_expiry_days = (1..5).random(), // Simulado

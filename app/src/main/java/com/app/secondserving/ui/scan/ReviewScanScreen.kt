@@ -28,6 +28,7 @@ import java.util.Locale
 private val GreenDark = Color(0xFF386641)
 private val BackgroundColor = Color(0xFFF5F5F0)
 private val CATEGORIES = listOf("Frutas", "Verduras", "Lácteos", "Carnes", "Granos", "Bebidas", "Enlatados", "Otros")
+private const val MAX_NAME_LENGTH = 35
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -139,7 +140,9 @@ fun ReviewItemCard(
         focusedTextColor = GreenDark,
         unfocusedTextColor = GreenDark,
         focusedTrailingIconColor = GreenDark,
-        unfocusedTrailingIconColor = GreenDark
+        unfocusedTrailingIconColor = GreenDark,
+        errorBorderColor = Color(0xFFC62828),
+        errorLabelColor = Color(0xFFC62828)
     )
 
     Card(
@@ -150,13 +153,36 @@ fun ReviewItemCard(
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                val isError = item.name.length > MAX_NAME_LENGTH
                 OutlinedTextField(
                     value = item.name,
-                    onValueChange = { onUpdate(item.copy(name = it)) },
+                    onValueChange = { 
+                        if (it.length <= MAX_NAME_LENGTH + 5) {
+                            onUpdate(item.copy(name = it))
+                        }
+                    },
                     label = { Text("Nombre", fontSize = 11.sp) },
                     modifier = Modifier.weight(1f),
                     colors = textFieldColors,
-                    singleLine = true
+                    singleLine = true,
+                    isError = isError,
+                    supportingText = {
+                        if (isError) {
+                            Text(
+                                "Máx. $MAX_NAME_LENGTH caracteres",
+                                color = Color(0xFFC62828),
+                                fontSize = 10.sp
+                            )
+                        } else {
+                            Text(
+                                "${item.name.length}/$MAX_NAME_LENGTH",
+                                color = GreenDark.copy(alpha = 0.6f),
+                                fontSize = 10.sp,
+                                modifier = Modifier.fillMaxWidth(),
+                                textAlign = androidx.compose.ui.text.style.TextAlign.End
+                            )
+                        }
+                    }
                 )
                 IconButton(onClick = onDelete) {
                     Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = Color(0xFFC62828))

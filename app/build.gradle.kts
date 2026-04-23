@@ -3,7 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.google.services)
-    id("com.google.devtools.ksp") version "2.2.10-2.0.2"
+    alias(libs.plugins.ksp)
 }
 
 android {
@@ -103,4 +103,9 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+}
+
+// Fix for 'testClasses' task not found in Android project
+tasks.register("testClasses") {
+    dependsOn("compileDebugUnitTestSources")
 }

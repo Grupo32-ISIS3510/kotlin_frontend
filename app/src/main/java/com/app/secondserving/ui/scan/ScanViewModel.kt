@@ -67,6 +67,9 @@ class ScanViewModel(
                 val result = scanner.scanReceipt(uri)
                 if (result.error != null) {
                     _uiState.value = ScanUiState.Error(result.error)
+                } else if (result.items.isEmpty()) {
+                    // Alerta cuando no se detecta nada correctamente
+                    _uiState.value = ScanUiState.Error("No se detectaron productos en la factura. Intenta tomar la foto con mejor iluminación o más cerca.")
                 } else {
                     val purchaseDate = result.purchaseDate ?: LocalDate.now().toString()
                     val editableItems = result.items.map { 

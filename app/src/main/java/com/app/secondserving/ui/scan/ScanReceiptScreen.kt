@@ -115,7 +115,10 @@ fun ScanReceiptScreen(
                 Text("Error de Escaneo", fontWeight = FontWeight.Bold, color = GreenDark)
             },
             text = {
-                Text((uiState as ScanUiState.Error).message)
+                Text(
+                    text = (uiState as ScanUiState.Error).message,
+                    color = GreenDark
+                )
             },
             shape = RoundedCornerShape(16.dp),
             containerColor = Color.White
