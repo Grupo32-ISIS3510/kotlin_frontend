@@ -43,9 +43,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.app.secondserving.data.InventoryRepository
+import com.app.secondserving.data.SavingsCache
 import com.app.secondserving.data.ScannedItem
 import com.app.secondserving.data.SessionManager
 import com.app.secondserving.data.network.InventoryItemRequest
+import com.app.secondserving.ui.home.HomeScreen
+import com.app.secondserving.ui.home.HomeViewModel
+import com.app.secondserving.ui.home.HomeViewModelFactory
 import com.app.secondserving.ui.inventory.AddItemScreen
 import com.app.secondserving.ui.inventory.ExpiredAlertPreferences
 import com.app.secondserving.ui.inventory.InventoryItemUi
@@ -81,7 +85,7 @@ enum class AppDestinations(val label: String, val icon: ImageVector) {
 @Composable
 fun MyApplicationApp() {
     val context = LocalContext.current
-    var currentDestination by rememberSaveable { mutableStateOf(AppDestinations.DESPENSA) }
+    var currentDestination by rememberSaveable { mutableStateOf(AppDestinations.INICIO) }
     var showAddItem by remember { mutableStateOf(false) }
     var showScanReceipt by remember { mutableStateOf(false) }
     var showLogoutDialog by remember { mutableStateOf(false) }
@@ -107,13 +111,18 @@ fun MyApplicationApp() {
         it as? ComponentActivity
     }?.application as? SecondServingApp
 
+    // El repositorio compartido garantiza que SavingsCache sea la misma instancia
+    // en InventoryViewModel y HomeViewModel, de modo que la invalidación al
+    // consumir/borrar un item sea visible inmediatamente al volver a Inicio.
+    val sharedRepository = app?.inventoryRepository ?: InventoryRepository(
+        com.app.secondserving.data.local.AppDatabase.getDatabase(context.applicationContext),
+        savingsCache = SavingsCache(context.applicationContext)
+    )
     val inventoryViewModel: InventoryViewModel = viewModel(
-        factory = InventoryViewModelFactory(
-            app?.inventoryRepository ?: InventoryRepository(
-                com.app.secondserving.data.local.AppDatabase.getDatabase(context.applicationContext)
-            ),
-            app?.expirationNotifier
-        )
+        factory = InventoryViewModelFactory(sharedRepository, app?.expirationNotifier)
+    )
+    val homeViewModel: HomeViewModel = viewModel(
+        factory = HomeViewModelFactory(sharedRepository)
     )
 
     val performLogout = {
@@ -130,7 +139,7 @@ fun MyApplicationApp() {
             itemsToReview != null ||
             showScanReceipt ||
             showAddItem ||
-            currentDestination != AppDestinations.DESPENSA
+            currentDestination != AppDestinations.INICIO
     ) {
         when {
             selectedItem != null -> selectedItem = null
@@ -143,8 +152,8 @@ fun MyApplicationApp() {
                 showAddItem = true
             }
             showAddItem -> showAddItem = false
-            currentDestination != AppDestinations.DESPENSA -> {
-                currentDestination = AppDestinations.DESPENSA
+            currentDestination != AppDestinations.INICIO -> {
+                currentDestination = AppDestinations.INICIO
             }
         }
     }
@@ -267,7 +276,12 @@ fun MyApplicationApp() {
                         selectedItemTip = tip
                     }
                 )
-                AppDestinations.INICIO -> WelcomeScreen()
+                AppDestinations.INICIO -> HomeScreen(
+                    viewModel = homeViewModel,
+                    inventoryViewModel = inventoryViewModel,
+                    userName = SessionManager(context).getFullName().orEmpty(),
+                    onNavigateToProfile = { currentDestination = AppDestinations.PERFIL }
+                )
                 AppDestinations.RECETAS -> PlaceholderScreen("Recetas")
                 AppDestinations.PERFIL -> ProfileScreen(
                     onOpenPreferences = { showPreferencesDialog = true },
@@ -502,43 +516,3 @@ private fun ProfileOptionRow(
     }
 }
 
-@Composable
-private fun WelcomeScreen() {
-    val greenDark = Color(0xFF386641)
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.White)
-            .padding(horizontal = 32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Surface(
-            shape = CircleShape,
-            color = Color(0xFFE8F5E9),
-            modifier = Modifier.size(120.dp)
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Text(text = "🌱", fontSize = 56.sp)
-            }
-        }
-        Spacer(modifier = Modifier.height(32.dp))
-        Text(
-            text = "Bienvenido a SecondServing",
-            fontSize = 28.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color(0xFF1A1A1A),
-            textAlign = TextAlign.Center,
-            lineHeight = 34.sp
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            text = "La solución perfecta para evitar el desperdicio y cuidar tu bolsillo",
-            fontSize = 16.sp,
-            color = greenDark,
-            textAlign = TextAlign.Center,
-            lineHeight = 22.sp,
-            fontWeight = FontWeight.Medium
-        )
-    }
-}

@@ -7,6 +7,7 @@ import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.PUT
 import retrofit2.http.Path
+import retrofit2.http.Query
 
 interface ApiService {
     @POST("auth/login")
@@ -29,4 +30,10 @@ interface ApiService {
 
     @POST("notifications/token")
     suspend fun registerFcmToken(@Body body: Map<String, String>): Response<Unit>
+
+    @GET("analytics/savings")
+    suspend fun getSavingsAnalytics(
+        @Query("month") month: Int? = null,
+        @Query("year") year: Int? = null
+    ): Response<SavingsAnalyticsResponse>
 }
