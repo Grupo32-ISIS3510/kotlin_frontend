@@ -27,42 +27,54 @@ class RecipeRepository(
             val inventory = foodItemDao.getAllItems().first()
             if (inventory.isEmpty()) return Result.Success(emptyList())
 
-            // 1. Crear una consulta basada en los ingredientes del usuario
-            // Tomamos los 2-3 ingredientes más cercanos a vencer para la búsqueda
-            val searchTerms = inventory.take(3).joinToString(" ") { it.name }
+            // 1. Obtener los nombres de los 3 productos más próximos a vencer y limpiarlos
+            // Tomamos la primera palabra para evitar marcas que confundan a la API (ej: "Leche Parmalat" -> "Leche")
+            val topIngredients = inventory.take(3).map { it.name.split(" ")[0] }
             
-            val response = edamamService.searchRecipes(
-                query = searchTerms,
-                appId = EDAMAM_APP_ID,
-                appKey = EDAMAM_APP_KEY,
-                userId = EDAMAM_USER_ID
-            )
+            val allFoundRecipes = mutableListOf<Recipe>()
 
-            if (response.isSuccessful) {
-                val edamamRecipes = response.body()?.hits?.mapNotNull { hit ->
-                    hit.recipe?.let { mapEdamamToRecipe(it, inventory.map { it.name }) }
-                } ?: emptyList()
-                
-                Result.Success(edamamRecipes)
-            } else {
-                // Fallback: Si la búsqueda específica falla, intentamos con categorías
-                val fallbackQuery = inventory.map { it.category }.distinct().take(2).joinToString(" ")
-                val fallbackResponse = edamamService.searchRecipes(
-                    query = fallbackQuery,
+            // 2. Buscar recetas para cada ingrediente individualmente para maximizar resultados
+            for (ingredient in topIngredients) {
+                val response = edamamService.searchRecipes(
+                    query = ingredient,
                     appId = EDAMAM_APP_ID,
                     appKey = EDAMAM_APP_KEY,
-                    userId = EDAMAM_USER_ID
+                    userId = EDAMAM_USER_ID,
+                    lang = "es"
                 )
-                
-                if (fallbackResponse.isSuccessful) {
-                    val fallbackRecipes = fallbackResponse.body()?.hits?.mapNotNull { hit ->
+
+                if (response.isSuccessful) {
+                    val recipes = response.body()?.hits?.mapNotNull { hit ->
                         hit.recipe?.let { mapEdamamToRecipe(it, inventory.map { it.name }) }
                     } ?: emptyList()
-                    Result.Success(fallbackRecipes)
-                } else {
-                    Result.Error(IOException("Error Edamam: ${response.code()} ${response.errorBody()?.string()}"))
+                    allFoundRecipes.addAll(recipes)
                 }
             }
+
+            // 3. Fallback: Si no hay resultados con nombres, intentamos con categorías
+            if (allFoundRecipes.isEmpty()) {
+                val categories = inventory.map { it.category }.distinct().take(2)
+                for (cat in categories) {
+                    val fallbackResponse = edamamService.searchRecipes(
+                        query = cat,
+                        appId = EDAMAM_APP_ID,
+                        appKey = EDAMAM_APP_KEY,
+                        userId = EDAMAM_USER_ID,
+                        lang = "es"
+                    )
+                    
+                    if (fallbackResponse.isSuccessful) {
+                        val fallbackRecipes = fallbackResponse.body()?.hits?.mapNotNull { hit ->
+                            hit.recipe?.let { mapEdamamToRecipe(it, inventory.map { it.name }) }
+                        } ?: emptyList()
+                        allFoundRecipes.addAll(fallbackRecipes)
+                    }
+                }
+            }
+            
+            // Devolver lista sin duplicados
+            Result.Success(allFoundRecipes.distinctBy { it.id })
+
         } catch (e: Exception) {
             Result.Error(e)
         }
