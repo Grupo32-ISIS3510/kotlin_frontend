@@ -1,5 +1,6 @@
-package com.app.secondserving.ui.inventory
+package com.app.secondserving.ui.scan
 
+import android.app.DatePickerDialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -20,46 +21,32 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.app.secondserving.data.ScannedItem
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.app.secondserving.data.ShelfLifePredictor
-import java.time.LocalDate
 import java.util.Locale
 
 private val GreenDark = Color(0xFF386641)
 private val BackgroundColor = Color(0xFFF5F5F0)
 private val CATEGORIES = listOf("Frutas", "Verduras", "Lácteos", "Carnes", "Granos", "Bebidas", "Enlatados", "Otros")
-
-data class EditableScannedItem(
-    val name: String,
-    val category: String,
-    val quantity: Int,
-    val price: Double?,
-    val purchaseDate: String,
-    val expiryDate: String
-)
+private const val MAX_NAME_LENGTH = 35
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReviewScanScreen(
-    scannedItems: List<ScannedItem>,
-    detectedPurchaseDate: String? = null,
-    onConfirm: (List<EditableScannedItem>) -> Unit,
+    viewModel: ScanViewModel,
+    onConfirm: () -> Unit,
     onNavigateBack: () -> Unit
 ) {
-    val defaultDate = detectedPurchaseDate ?: LocalDate.now().toString()
-    
-    var items by remember { 
-        mutableStateOf(scannedItems.map { 
-            val predictedExpiry = ShelfLifePredictor.predictExpiryDate(defaultDate, it.category)
-            EditableScannedItem(
-                name = it.name, 
-                category = it.category, 
-                quantity = 1, 
-                price = it.price,
-                purchaseDate = defaultDate,
-                expiryDate = predictedExpiry
-            ) 
-        }) 
+    // Usamos reviewState como SSOT para la edición de items
+    val reviewState by viewModel.reviewState.collectAsStateWithLifecycle()
+    val items = reviewState.items
+
+    // Efecto para navegar al guardar con éxito
+    LaunchedEffect(reviewState.saveSuccess) {
+        if (reviewState.saveSuccess) {
+            onConfirm()
+            viewModel.resetReviewState()
+        }
     }
 
     Scaffold(
@@ -78,38 +65,58 @@ fun ReviewScanScreen(
         },
         containerColor = BackgroundColor
     ) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
-            Text(
-                "Ajusta los detalles finales de tu compra.",
-                color = GreenDark,
-                fontSize = 14.sp,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
+        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+            Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+                Text(
+                    "Ajusta los detalles finales de tu compra.",
+                    color = GreenDark,
+                    fontSize = 14.sp,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
 
-            LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                itemsIndexed(items) { index, item ->
-                    ReviewItemCard(
-                        item = item,
-                        onUpdate = { updatedItem ->
-                            items = items.toMutableList().apply { this[index] = updatedItem }
-                        },
-                        onDelete = {
-                            items = items.toMutableList().apply { removeAt(index) }
-                        }
-                    )
+                LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    itemsIndexed(items) { index, item ->
+                        ReviewItemCard(
+                            item = item,
+                            onUpdate = { updatedItem ->
+                                viewModel.updateItem(index, updatedItem)
+                            },
+                            onDelete = {
+                                viewModel.removeItem(index)
+                            }
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Button(
+                    onClick = { viewModel.saveScannedItems() },
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = GreenDark),
+                    enabled = items.isNotEmpty() && !reviewState.isSaving
+                ) {
+                    if (reviewState.isSaving) {
+                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                    } else {
+                        Text("Confirmar y Guardar (${items.size})", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    }
                 }
             }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Button(
-                onClick = { onConfirm(items) },
-                modifier = Modifier.fillMaxWidth().height(56.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = GreenDark),
-                enabled = items.isNotEmpty()
-            ) {
-                Text("Confirmar y Guardar (${items.size})", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
+            
+            // Mostrar error si ocurre al guardar
+            reviewState.saveError?.let { error ->
+                Snackbar(
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp),
+                    action = {
+                        TextButton(onClick = { viewModel.resetReviewState() }) {
+                            Text("OK", color = Color.White)
+                        }
+                    }
+                ) {
+                    Text(error)
+                }
             }
         }
     }
@@ -123,7 +130,6 @@ fun ReviewItemCard(
     onDelete: () -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
-    var showDatePicker by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
     val textFieldColors = OutlinedTextFieldDefaults.colors(
@@ -134,7 +140,9 @@ fun ReviewItemCard(
         focusedTextColor = GreenDark,
         unfocusedTextColor = GreenDark,
         focusedTrailingIconColor = GreenDark,
-        unfocusedTrailingIconColor = GreenDark
+        unfocusedTrailingIconColor = GreenDark,
+        errorBorderColor = Color(0xFFC62828),
+        errorLabelColor = Color(0xFFC62828)
     )
 
     Card(
@@ -145,13 +153,36 @@ fun ReviewItemCard(
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                val isError = item.name.length > MAX_NAME_LENGTH
                 OutlinedTextField(
                     value = item.name,
-                    onValueChange = { onUpdate(item.copy(name = it)) },
+                    onValueChange = { 
+                        if (it.length <= MAX_NAME_LENGTH + 5) {
+                            onUpdate(item.copy(name = it))
+                        }
+                    },
                     label = { Text("Nombre", fontSize = 11.sp) },
                     modifier = Modifier.weight(1f),
                     colors = textFieldColors,
-                    singleLine = true
+                    singleLine = true,
+                    isError = isError,
+                    supportingText = {
+                        if (isError) {
+                            Text(
+                                "Máx. $MAX_NAME_LENGTH caracteres",
+                                color = Color(0xFFC62828),
+                                fontSize = 10.sp
+                            )
+                        } else {
+                            Text(
+                                "${item.name.length}/$MAX_NAME_LENGTH",
+                                color = GreenDark.copy(alpha = 0.6f),
+                                fontSize = 10.sp,
+                                modifier = Modifier.fillMaxWidth(),
+                                textAlign = androidx.compose.ui.text.style.TextAlign.End
+                            )
+                        }
+                    }
                 )
                 IconButton(onClick = onDelete) {
                     Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = Color(0xFFC62828))
@@ -206,7 +237,17 @@ fun ReviewItemCard(
                 label = { Text("Vencimiento estimado", fontSize = 11.sp) },
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                 trailingIcon = {
-                    IconButton(onClick = { showDatePicker = true }) {
+                    IconButton(onClick = {
+                        val dateParts = item.expiryDate.split("-")
+                        val year = dateParts[0].toInt()
+                        val month = dateParts[1].toInt() - 1
+                        val day = dateParts[2].toInt()
+
+                        DatePickerDialog(context, { _, y, m, d ->
+                            val newDate = String.format(Locale.US, "%04d-%02d-%02d", y, m + 1, d)
+                            onUpdate(item.copy(expiryDate = newDate))
+                        }, year, month, day).show()
+                    }) {
                         Icon(Icons.Default.CalendarToday, contentDescription = "Cambiar", tint = GreenDark, modifier = Modifier.size(20.dp))
                     }
                 },
@@ -214,24 +255,5 @@ fun ReviewItemCard(
                 textStyle = LocalTextStyle.current.copy(fontSize = 12.sp)
             )
         }
-    }
-
-    if (showDatePicker) {
-        val dateParts = item.expiryDate.split("-")
-        val currentYear = dateParts[0].toInt()
-        val currentMonth = dateParts[1].toInt() - 1
-        val currentDay = dateParts[2].toInt()
-
-        val datePickerDialog = android.app.DatePickerDialog(
-            context,
-            { _, year, month, day ->
-                val newDate = String.format(Locale.US, "%04d-%02d-%02d", year, month + 1, day)
-                onUpdate(item.copy(expiryDate = newDate))
-                showDatePicker = false
-            },
-            currentYear, currentMonth, currentDay
-        )
-        datePickerDialog.setOnCancelListener { showDatePicker = false }
-        datePickerDialog.show()
     }
 }

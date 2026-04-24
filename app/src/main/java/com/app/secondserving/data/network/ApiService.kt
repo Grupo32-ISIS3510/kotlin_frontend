@@ -16,7 +16,7 @@ interface ApiService {
     suspend fun register(@Body request: RegisterRequest): Response<TokenResponse>
 
     @GET("inventory")
-    suspend fun getInventory(): Response<InventoryResponse>
+    suspend fun getInventory(): Response<List<InventoryItem>>
 
     @POST("inventory")
     suspend fun createInventoryItem(@Body request: InventoryItemRequest): Response<InventoryItem>
@@ -29,4 +29,11 @@ interface ApiService {
 
     @POST("notifications/token")
     suspend fun registerFcmToken(@Body body: Map<String, String>): Response<Unit>
+
+    // Recipe Endpoints - Updated to handle direct list response
+    @GET("recipes/suggestions")
+    suspend fun getRecipes(): Response<List<Recipe>>
+
+    @POST("recipes/{id}/cook")
+    suspend fun cookRecipe(@Path("id") recipeId: Int): Response<Unit>
 }

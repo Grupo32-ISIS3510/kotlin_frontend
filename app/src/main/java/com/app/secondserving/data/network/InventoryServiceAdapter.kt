@@ -7,8 +7,6 @@ import java.io.IOException
 /**
  * Service Adapter / Web Service Broker.
  * Patrón: Encapsula el acceso a servicios remotos (Retrofit).
- * - Maneja errores, timeouts, autenticación
- * - Mapea DTOs del servicio a modelos de dominio
  */
 class InventoryServiceAdapter(
     private val apiService: ApiService = RetrofitClient.authInstance
@@ -22,11 +20,12 @@ class InventoryServiceAdapter(
         return try {
             val response = apiService.getInventory()
             if (response.isSuccessful) {
-                val items = response.body()?.items?.map { it.toEntity() }
+                // Ahora response.body() es directamente List<InventoryItem>
+                val items = response.body()?.map { it.toEntity() }
                 if (items != null) {
                     Result.Success(items)
                 } else {
-                    Result.Error(IOException("Empty response body from server"))
+                    Result.Success(emptyList())
                 }
             } else {
                 Result.Error(
@@ -42,7 +41,6 @@ class InventoryServiceAdapter(
 
     /**
      * Crea un nuevo item en el backend.
-     * @return Result con el item creado o Error
      */
     suspend fun createInventoryItem(request: InventoryItemRequest): Result<FoodItemEntity> {
         return try {
@@ -69,7 +67,6 @@ class InventoryServiceAdapter(
      */
     suspend fun deleteInventoryItem(itemId: String): Result<Unit> {
         return try {
-            // Nota: El backend debe implementar DELETE /inventory/{id}
             val response = apiService.deleteInventoryItem(itemId)
             if (response.isSuccessful) {
                 Result.Success(Unit)
@@ -88,7 +85,6 @@ class InventoryServiceAdapter(
      */
     suspend fun updateInventoryItem(item: FoodItemEntity): Result<FoodItemEntity> {
         return try {
-            // Nota: El backend debe implementar PUT /inventory/{id}
             val request = InventoryItemRequest(
                 name = item.name,
                 category = item.category,
@@ -123,24 +119,11 @@ private fun InventoryItem.toEntity(): FoodItemEntity {
         id = this.id,
         name = this.name,
         category = this.category,
-        quantity = this.quantity,
-        purchaseDate = "", // El backend no devuelve purchase_date en la respuesta
+        quantity = this.quantity.toInt(),
+        purchaseDate = "", 
         expiryDate = this.expiry_date,
         originalShelfLifeDays = null,
         createdAt = System.currentTimeMillis(),
         updatedAt = System.currentTimeMillis()
-    )
-}
-
-/**
- * Extensión para mapear entidad Room a DTO del backend.
- */
-fun FoodItemEntity.toRequest(): InventoryItemRequest {
-    return InventoryItemRequest(
-        name = this.name,
-        category = this.category,
-        quantity = this.quantity.toDouble(),
-        purchase_date = this.purchaseDate,
-        expiry_date = this.expiryDate
     )
 }

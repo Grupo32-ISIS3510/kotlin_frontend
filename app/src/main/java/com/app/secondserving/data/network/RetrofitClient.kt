@@ -8,30 +8,49 @@ import retrofit2.converter.gson.GsonConverterFactory
 
 object RetrofitClient {
 
-    // Para celular físico usa: "http://192.168.100.117:8000/api/v1/"
-    private const val BASE_URL = "http://3.16.198.192" +
-            "/api/v1/"
+    private const val BASE_URL = "http://3.16.198.192/api/v1/"
+    private const val EDAMAM_BASE_URL = "https://api.edamam.com/"
 
     private val logging = HttpLoggingInterceptor().apply {
         level = HttpLoggingInterceptor.Level.BODY
     }
+
+    private val baseClient = OkHttpClient.Builder()
+        .addInterceptor(logging)
+        .build()
+
+    // Cliente específico para Edamam con el Header requerido
+    private val edamamClient = OkHttpClient.Builder()
+        .addInterceptor(logging)
+        .addInterceptor { chain ->
+            val request = chain.request().newBuilder()
+                .addHeader("Edamam-Account-User", "arnulfo_user")
+                .build()
+            chain.proceed(request)
+        }
+        .build()
 
     // Cliente sin autenticación — login y register
     val publicInstance: ApiService by lazy {
         Retrofit.Builder()
             .baseUrl(BASE_URL)
             .addConverterFactory(GsonConverterFactory.create())
-            .client(
-                OkHttpClient.Builder()
-                    .addInterceptor(logging)
-                    .build()
-            )
+            .client(baseClient)
             .build()
             .create(ApiService::class.java)
     }
 
+    // Cliente para Edamam (Recetas en Español)
+    val edamamInstance: EdamamService by lazy {
+        Retrofit.Builder()
+            .baseUrl(EDAMAM_BASE_URL)
+            .addConverterFactory(GsonConverterFactory.create())
+            .client(edamamClient) // Usamos el cliente con el header
+            .build()
+            .create(EdamamService::class.java)
+    }
+
     // Cliente autenticado — todos los endpoints protegidos
-    // Se inicializa al arrancar la app via SecondServingApp
     lateinit var authInstance: ApiService
         private set
 
