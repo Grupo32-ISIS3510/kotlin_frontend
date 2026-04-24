@@ -12,20 +12,9 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.sp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Add
@@ -40,7 +29,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.app.secondserving.data.InventoryRepository
 import com.app.secondserving.data.SavingsCache
@@ -50,6 +43,7 @@ import com.app.secondserving.data.network.InventoryItemRequest
 import com.app.secondserving.ui.home.HomeScreen
 import com.app.secondserving.ui.home.HomeViewModel
 import com.app.secondserving.ui.home.HomeViewModelFactory
+import com.app.secondserving.data.scan.ReceiptScanner
 import com.app.secondserving.ui.inventory.AddItemScreen
 import com.app.secondserving.ui.inventory.ExpiredAlertPreferences
 import com.app.secondserving.ui.inventory.InventoryItemUi
@@ -57,11 +51,18 @@ import com.app.secondserving.ui.inventory.InventoryScreen
 import com.app.secondserving.ui.inventory.InventoryViewModel
 import com.app.secondserving.ui.inventory.InventoryViewModelFactory
 import com.app.secondserving.ui.inventory.ItemDetailScreen
-import com.app.secondserving.ui.inventory.ScanReceiptScreen
-import com.app.secondserving.ui.inventory.ReviewScanScreen
 import com.app.secondserving.ui.inventory.WeatherViewModel
 import com.app.secondserving.ui.login.LoginActivity
+import com.app.secondserving.ui.recipes.RecipeDetailScreen
+import com.app.secondserving.ui.recipes.RecipeScreen
+import com.app.secondserving.ui.recipes.RecipeViewModel
+import com.app.secondserving.ui.recipes.RecipeViewModelFactory
+import com.app.secondserving.ui.scan.ReviewScanScreen
+import com.app.secondserving.ui.scan.ScanReceiptScreen
+import com.app.secondserving.ui.scan.ScanViewModel
+import com.app.secondserving.ui.scan.ScanViewModelFactory
 import com.app.secondserving.ui.theme.MyApplicationTheme
+import com.app.secondserving.data.repository.RecipeRepository
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -93,9 +94,8 @@ fun MyApplicationApp() {
     var selectedItem by remember { mutableStateOf<InventoryItemUi?>(null) }
     var selectedItemTip by remember { mutableStateOf("") }
     
-    // Estado para la pantalla de revisión
-    var itemsToReview by remember { mutableStateOf<List<ScannedItem>?>(null) }
-    var detectedDate by remember { mutableStateOf<String?>(null) }
+    // Estado para recetas
+    var selectedRecipe by remember { mutableStateOf<com.app.secondserving.data.network.Recipe?>(null) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -118,12 +118,25 @@ fun MyApplicationApp() {
         com.app.secondserving.data.local.AppDatabase.getDatabase(context.applicationContext),
         savingsCache = SavingsCache(context.applicationContext)
     )
+    val database = com.app.secondserving.data.local.AppDatabase.getDatabase(context.applicationContext)
+    val inventoryRepo = app?.inventoryRepository ?: InventoryRepository(database)
+
     val inventoryViewModel: InventoryViewModel = viewModel(
         factory = InventoryViewModelFactory(sharedRepository, app?.expirationNotifier)
     )
     val homeViewModel: HomeViewModel = viewModel(
         factory = HomeViewModelFactory(sharedRepository)
+        factory = InventoryViewModelFactory(inventoryRepo)
     )
+
+    // Inicializar ScanViewModel en este nivel para que sea compartido
+    val scanViewModel: ScanViewModel = viewModel(
+        factory = ScanViewModelFactory(
+            ReceiptScanner(context.applicationContext),
+            inventoryRepo
+        )
+    )
+    val scanReviewState by scanViewModel.reviewState.collectAsStateWithLifecycle()
 
     val performLogout = {
         SessionManager(context).clearSession()
@@ -134,67 +147,77 @@ fun MyApplicationApp() {
         (context as? ComponentActivity)?.finish()
     }
 
+    // Lógica unificada para el botón de atrás
     BackHandler(
         enabled = selectedItem != null ||
             itemsToReview != null ||
             showScanReceipt ||
             showAddItem ||
             currentDestination != AppDestinations.INICIO
+                selectedRecipe != null ||
+                showScanReceipt ||
+                showAddItem ||
+                scanReviewState.items.isNotEmpty() ||
+                currentDestination != AppDestinations.DESPENSA
     ) {
         when {
             selectedItem != null -> selectedItem = null
-            itemsToReview != null -> {
-                itemsToReview = null
-                showScanReceipt = true
-            }
+            selectedRecipe != null -> selectedRecipe = null
+
+            // PRIORIDAD 1: Si estamos en la cámara, volvemos a Agregar manual y LIMPIAMOS items
             showScanReceipt -> {
+                scanViewModel.resetReviewState()
+                scanViewModel.resetState()
                 showScanReceipt = false
                 showAddItem = true
             }
             showAddItem -> showAddItem = false
             currentDestination != AppDestinations.INICIO -> {
                 currentDestination = AppDestinations.INICIO
+
+            // PRIORIDAD 2: Si estamos en agregar manual, simplemente lo cerramos
+            showAddItem -> {
+                showAddItem = false
+            }
+
+            // PRIORIDAD 3: Si hay items (revisión), volvemos a la cámara para re-intentar
+            scanReviewState.items.isNotEmpty() -> {
+                scanViewModel.resetState()
+                showScanReceipt = true
+            }
+
+            currentDestination != AppDestinations.DESPENSA -> {
+                currentDestination = AppDestinations.DESPENSA
             }
         }
     }
 
-    // Pantalla de Revisión
-    if (itemsToReview != null) {
-        ReviewScanScreen(
-            scannedItems = itemsToReview!!,
-            detectedPurchaseDate = detectedDate,
-            onConfirm = { reviewedItems ->
-                // Anti-patrón resuelto: Guardado masivo eficiente
-                val requests = reviewedItems.map { item ->
-                    InventoryItemRequest(
-                        name = item.name,
-                        category = item.category,
-                        quantity = item.quantity.toDouble(),
-                        purchase_date = item.purchaseDate,
-                        expiry_date = item.expiryDate
-                    )
-                }
-                inventoryViewModel.createInventoryItems(requests)
-                Toast.makeText(context, "Agregando ${requests.size} productos...", Toast.LENGTH_SHORT).show()
-                itemsToReview = null
-                currentDestination = AppDestinations.DESPENSA
-            },
-            onNavigateBack = {
-                itemsToReview = null
-                showScanReceipt = true
-            }
+    // JERARQUÍA DE RENDERIZADO (Prioridad de Overlays)
+
+    // 1. Detalles (Item o Receta)
+    if (selectedItem != null) {
+        val weatherVm: WeatherViewModel = viewModel()
+        ItemDetailScreen(
+            item = selectedItem!!,
+            storageTip = selectedItemTip,
+            weatherState = weatherVm.weatherState.collectAsState().value,
+            onNavigateBack = { selectedItem = null }
         )
         return
     }
 
     if (showScanReceipt) {
         ScanReceiptScreen(
-            onItemsScanned = { items, purchaseDate ->
+            viewModel = scanViewModel,
+            onItemsScanned = { _, _ ->
+                // Al terminar el escaneo, cerramos cámara.
+                // Esto hará que caiga en la pantalla de revisión (Prioridad 4)
                 showScanReceipt = false
-                itemsToReview = items
-                detectedDate = purchaseDate
             },
             onNavigateBack = { 
+                // Al dar atrás desde la cámara, limpiamos estado y vamos a manual
+                scanViewModel.resetReviewState()
+                scanViewModel.resetState()
                 showScanReceipt = false
                 showAddItem = true
             }
@@ -202,6 +225,7 @@ fun MyApplicationApp() {
         return
     }
 
+    // 3. Agregar Item Manual
     if (showAddItem) {
         AddItemScreen(
             viewModel = inventoryViewModel,
@@ -214,17 +238,27 @@ fun MyApplicationApp() {
         return
     }
 
-    if (selectedItem != null) {
-        val weatherVm: WeatherViewModel = viewModel()
-        ItemDetailScreen(
-            item = selectedItem!!,
-            storageTip = selectedItemTip,
-            weatherState = weatherVm.weatherState.collectAsState().value,
-            onNavigateBack = { selectedItem = null }
+    // 4. Revisión de Factura (Solo si hay items y no estamos en los overlays superiores)
+    if (scanReviewState.items.isNotEmpty()) {
+        ReviewScanScreen(
+            viewModel = scanViewModel,
+            onConfirm = {
+                val requests = scanViewModel.getInventoryRequests()
+                inventoryViewModel.createInventoryItems(requests)
+                Toast.makeText(context, "Agregando ${requests.size} productos...", Toast.LENGTH_SHORT).show()
+                scanViewModel.resetState()
+                scanViewModel.resetReviewState()
+                currentDestination = AppDestinations.DESPENSA
+            },
+            onNavigateBack = {
+                // Al dar atrás desde revisión, volvemos a la cámara
+                showScanReceipt = true
+            }
         )
         return
     }
 
+    // 5. Flujo Principal (BottomBar)
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         bottomBar = {
@@ -276,6 +310,16 @@ fun MyApplicationApp() {
                         selectedItemTip = tip
                     }
                 )
+                AppDestinations.INICIO -> WelcomeScreen()
+                AppDestinations.RECETAS -> {
+                    val recipeViewModel: RecipeViewModel = viewModel(
+                        factory = RecipeViewModelFactory(RecipeRepository(database))
+                    )
+                    RecipeScreen(
+                        viewModel = recipeViewModel,
+                        onRecipeClick = { recipe -> selectedRecipe = recipe }
+                    )
+                }
                 AppDestinations.INICIO -> HomeScreen(
                     viewModel = homeViewModel,
                     inventoryViewModel = inventoryViewModel,
@@ -359,7 +403,7 @@ private fun ProfileScreen(
     val background = Color(0xFFF5F5F0)
     val fullName = sessionManager.getFullName().orEmpty().ifBlank { "Usuario" }
     val email = sessionManager.getEmail().orEmpty().ifBlank { "Sin correo registrado" }
-    val initial = fullName.first().uppercase()
+    val initial = fullName.firstOrNull()?.uppercase() ?: "?"
 
     Column(
         modifier = Modifier
@@ -440,7 +484,7 @@ private fun ProfileScreen(
 
 @Composable
 private fun StatsRow(greenDark: Color, greenLight: Color) {
-    androidx.compose.foundation.layout.Row(
+    Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
@@ -451,7 +495,7 @@ private fun StatsRow(greenDark: Color, greenLight: Color) {
 }
 
 @Composable
-private fun androidx.compose.foundation.layout.RowScope.StatCard(
+private fun RowScope.StatCard(
     value: String,
     label: String,
     greenDark: Color,
@@ -496,7 +540,7 @@ private fun ProfileOptionRow(
         shape = RoundedCornerShape(12.dp),
         color = Color(0xFFF8F8F5)
     ) {
-        androidx.compose.foundation.layout.Row(
+        Row(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {

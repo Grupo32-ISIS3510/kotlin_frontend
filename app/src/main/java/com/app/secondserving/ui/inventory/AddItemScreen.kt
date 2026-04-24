@@ -21,12 +21,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import com.app.secondserving.data.ShelfLifePredictor
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
-import java.util.Calendar
 
 private val GreenDark = Color(0xFF386641)
 private val BackgroundColor = Color(0xFFF5F5F0)
@@ -108,7 +106,7 @@ fun AddItemScreen(
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(
-                            Icons.Default.ArrowBack,
+                            Icons.Default.ArrowBack, 
                             contentDescription = "Volver",
                             tint = GreenDark
                         )
@@ -230,7 +228,7 @@ fun AddItemScreen(
                 trailingIcon = {
                     IconButton(onClick = { showPurchaseDatePicker = true }) {
                         Icon(
-                            Icons.Default.CalendarToday,
+                            Icons.Default.CalendarToday, 
                             contentDescription = "Seleccionar fecha",
                             tint = GreenDark
                         )
@@ -242,28 +240,26 @@ fun AddItemScreen(
 
             // Dialog selector de fecha de compra
             if (showPurchaseDatePicker) {
-                val today = LocalDate.now()
-                var selectedYear by rememberSaveable { mutableStateOf(today.year) }
-                var selectedMonth by rememberSaveable { mutableStateOf(today.monthValue - 1) }
-                var selectedDay by rememberSaveable { mutableStateOf(today.dayOfMonth) }
-
+                var selectedYear by rememberSaveable { mutableStateOf(LocalDate.now().year) }
+                var selectedMonth by rememberSaveable { mutableStateOf(LocalDate.now().monthValue - 1) }
+                var selectedDay by rememberSaveable { mutableStateOf(LocalDate.now().dayOfMonth) }
+                
                 AlertDialog(
                     onDismissRequest = { showPurchaseDatePicker = false },
-                    containerColor = Color.White,
                     title = { Text("Fecha de compra", color = GreenDark) },
                     text = {
-                        AndroidView(
-                            factory = { ctx ->
-                                android.widget.DatePicker(ctx).apply {
-                                    updateDate(selectedYear, selectedMonth, selectedDay)
-                                    setOnDateChangedListener { _, year, month, day ->
-                                        selectedYear = year
-                                        selectedMonth = month
-                                        selectedDay = day
-                                    }
-                                }
+                        android.widget.DatePicker(
+                            androidx.compose.ui.platform.LocalContext.current,
+                            null,
+                            android.R.attr.datePickerStyle
+                        ).apply {
+                            updateDate(selectedYear, selectedMonth, selectedDay)
+                            setOnDateChangedListener { _, year, month, day ->
+                                selectedYear = year
+                                selectedMonth = month
+                                selectedDay = day
                             }
-                        )
+                        }
                     },
                     confirmButton = {
                         TextButton(
@@ -337,7 +333,7 @@ fun AddItemScreen(
                 trailingIcon = {
                     IconButton(onClick = { showExpiryDatePicker = true }) {
                         Icon(
-                            Icons.Default.CalendarToday,
+                            Icons.Default.CalendarToday, 
                             contentDescription = "Seleccionar fecha",
                             tint = GreenDark
                         )
@@ -349,48 +345,26 @@ fun AddItemScreen(
 
             // Dialog selector de fecha de expiración
             if (showExpiryDatePicker) {
-                // Fecha mínima: fecha de compra + 1 día (o mañana si no hay fecha de compra)
-                val minExpiryDate = if (purchaseDate.isNotBlank()) {
-                    try { LocalDate.parse(purchaseDate, DATE_FORMAT).plusDays(1) }
-                    catch (e: Exception) { LocalDate.now().plusDays(1) }
-                } else {
-                    LocalDate.now().plusDays(1)
-                }
-                val initExpiry = if (expiryDate.isNotBlank()) {
-                    try {
-                        val d = LocalDate.parse(expiryDate, DATE_FORMAT)
-                        if (d.isBefore(minExpiryDate)) minExpiryDate else d
-                    } catch (e: Exception) { minExpiryDate }
-                } else {
-                    minExpiryDate
-                }
-                var expYear by rememberSaveable { mutableStateOf(initExpiry.year) }
-                var expMonth by rememberSaveable { mutableStateOf(initExpiry.monthValue - 1) }
-                var expDay by rememberSaveable { mutableStateOf(initExpiry.dayOfMonth) }
-
+                var expYear by rememberSaveable { mutableStateOf(LocalDate.now().year) }
+                var expMonth by rememberSaveable { mutableStateOf(LocalDate.now().monthValue - 1) }
+                var expDay by rememberSaveable { mutableStateOf(LocalDate.now().dayOfMonth) }
+                
                 AlertDialog(
                     onDismissRequest = { showExpiryDatePicker = false },
-                    containerColor = Color.White,
                     title = { Text("Fecha de vencimiento", color = GreenDark) },
                     text = {
-                        AndroidView(
-                            factory = { ctx ->
-                                android.widget.DatePicker(ctx).apply {
-                                    // Establecer fecha mínima (purchaseDate + 1 día)
-                                    val cal = Calendar.getInstance()
-                                    cal.set(minExpiryDate.year, minExpiryDate.monthValue - 1, minExpiryDate.dayOfMonth, 0, 0, 0)
-                                    cal.set(Calendar.MILLISECOND, 0)
-                                    minDate = cal.timeInMillis
-
-                                    updateDate(expYear, expMonth, expDay)
-                                    setOnDateChangedListener { _, year, month, day ->
-                                        expYear = year
-                                        expMonth = month
-                                        expDay = day
-                                    }
-                                }
+                        android.widget.DatePicker(
+                            androidx.compose.ui.platform.LocalContext.current,
+                            null,
+                            android.R.attr.datePickerStyle
+                        ).apply {
+                            updateDate(expYear, expMonth, expDay)
+                            setOnDateChangedListener { _, year, month, day ->
+                                expYear = year
+                                expMonth = month
+                                expDay = day
                             }
-                        )
+                        }
                     },
                     confirmButton = {
                         TextButton(
@@ -434,7 +408,7 @@ fun AddItemScreen(
                     nameError = name.isBlank()
                     quantityError = quantity.toDoubleOrNull() == null
                     purchaseDateError = purchaseDate.isBlank()
-
+                    
                     // Usar predicción si no hay fecha de expiración
                     val finalExpiryDate = if (expiryDate.isBlank() && predictedExpiryDate.isNotBlank()) {
                         predictedExpiryDate
