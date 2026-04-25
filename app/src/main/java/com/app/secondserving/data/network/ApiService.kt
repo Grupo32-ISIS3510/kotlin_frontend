@@ -75,9 +75,16 @@ interface ApiService {
 
     // Recipe Endpoints
     // El backend computa los matches con el inventario en el servidor
-    // y devuelve directamente la lista de recetas sugeridas.
+    // y devuelve directamente la lista de recetas sugeridas. Esta lista
+    // viene "liviana" (sin ingredientes ni instrucciones).
     @GET("recipes/suggestions")
     suspend fun getRecipes(): Response<List<Recipe>>
+
+    // Detalle completo de una receta. /suggestions no incluye ingredients
+    // ni instructions, así que este endpoint los trae cuando el usuario
+    // abre la pantalla de detalle.
+    @GET("recipes/{id}")
+    suspend fun getRecipeDetail(@Path("id") recipeId: String): Response<Recipe>
 
     // Registra una interacción del usuario con una receta (action = "viewed" | "cooked").
     // Antes era POST /recipes/{id}/cook (sin body) — ese endpoint no existe en

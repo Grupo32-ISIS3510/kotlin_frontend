@@ -64,6 +64,25 @@ class RecipeRepository(
             Result.Error(e)
         }
     }
+
+    /**
+     * Trae el detalle completo de una receta — ingredientes e instrucciones,
+     * que /suggestions no incluye. Lo llama RecipeDetailScreen al montarse.
+     */
+    suspend fun getRecipeDetail(recipeId: String): Result<Recipe> {
+        return try {
+            val response = apiService.getRecipeDetail(recipeId)
+            if (response.isSuccessful) {
+                val body = response.body()
+                if (body != null) Result.Success(body)
+                else Result.Error(IOException("Respuesta vacía del backend"))
+            } else {
+                Result.Error(IOException("Error ${response.code()}: ${response.message()}"))
+            }
+        } catch (e: Exception) {
+            Result.Error(e)
+        }
+    }
 }
 
 /* ----------------------------------------------------------------------

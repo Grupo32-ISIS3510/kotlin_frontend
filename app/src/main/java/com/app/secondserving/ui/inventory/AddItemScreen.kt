@@ -23,7 +23,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.app.secondserving.data.ShelfLifePredictor
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
 private val GreenDark = Color(0xFF386641)
@@ -238,48 +240,36 @@ fun AddItemScreen(
                 singleLine = true
             )
 
-            // Dialog selector de fecha de compra
+            // Dialog selector de fecha de compra. Antes este bloque construía
+            // un android.widget.DatePicker (View clásico) dentro del slot `text`
+            // del AlertDialog, pero el View no se renderizaba en el árbol de
+            // Compose y el diálogo aparecía vacío. Lo reemplacé por
+            // DatePickerDialog + DatePicker de Material3, que es la API
+            // recomendada en Compose.
             if (showPurchaseDatePicker) {
-                var selectedYear by rememberSaveable { mutableStateOf(LocalDate.now().year) }
-                var selectedMonth by rememberSaveable { mutableStateOf(LocalDate.now().monthValue - 1) }
-                var selectedDay by rememberSaveable { mutableStateOf(LocalDate.now().dayOfMonth) }
-                
-                AlertDialog(
+                val state = rememberDatePickerState(
+                    initialSelectedDateMillis = parseDateMillisOrToday(purchaseDate)
+                )
+                DatePickerDialog(
                     onDismissRequest = { showPurchaseDatePicker = false },
-                    title = { Text("Fecha de compra", color = GreenDark) },
-                    text = {
-                        android.widget.DatePicker(
-                            androidx.compose.ui.platform.LocalContext.current,
-                            null,
-                            android.R.attr.datePickerStyle
-                        ).apply {
-                            updateDate(selectedYear, selectedMonth, selectedDay)
-                            setOnDateChangedListener { _, year, month, day ->
-                                selectedYear = year
-                                selectedMonth = month
-                                selectedDay = day
-                            }
-                        }
-                    },
                     confirmButton = {
-                        TextButton(
-                            onClick = {
-                                val date = String.format("%04d-%02d-%02d", selectedYear, selectedMonth + 1, selectedDay)
-                                purchaseDate = date
+                        TextButton(onClick = {
+                            state.selectedDateMillis?.let {
+                                purchaseDate = millisToIsoDate(it)
                                 purchaseDateError = false
                                 showPredictionTip = false
-                                showPurchaseDatePicker = false
                             }
-                        ) {
-                            Text("OK", color = GreenDark)
-                        }
+                            showPurchaseDatePicker = false
+                        }) { Text("OK", color = GreenDark) }
                     },
                     dismissButton = {
                         TextButton(onClick = { showPurchaseDatePicker = false }) {
                             Text("Cancelar", color = GreenDark)
                         }
                     }
-                )
+                ) {
+                    DatePicker(state = state, title = { Text("Fecha de compra", modifier = Modifier.padding(16.dp), color = GreenDark) })
+                }
             }
 
             // Tip de predicción
@@ -343,48 +333,32 @@ fun AddItemScreen(
                 singleLine = true
             )
 
-            // Dialog selector de fecha de expiración
+            // Dialog selector de fecha de expiración (mismo cambio que el de
+            // fecha de compra: pasamos al DatePickerDialog de Material3).
             if (showExpiryDatePicker) {
-                var expYear by rememberSaveable { mutableStateOf(LocalDate.now().year) }
-                var expMonth by rememberSaveable { mutableStateOf(LocalDate.now().monthValue - 1) }
-                var expDay by rememberSaveable { mutableStateOf(LocalDate.now().dayOfMonth) }
-                
-                AlertDialog(
+                val state = rememberDatePickerState(
+                    initialSelectedDateMillis = parseDateMillisOrToday(expiryDate)
+                )
+                DatePickerDialog(
                     onDismissRequest = { showExpiryDatePicker = false },
-                    title = { Text("Fecha de vencimiento", color = GreenDark) },
-                    text = {
-                        android.widget.DatePicker(
-                            androidx.compose.ui.platform.LocalContext.current,
-                            null,
-                            android.R.attr.datePickerStyle
-                        ).apply {
-                            updateDate(expYear, expMonth, expDay)
-                            setOnDateChangedListener { _, year, month, day ->
-                                expYear = year
-                                expMonth = month
-                                expDay = day
-                            }
-                        }
-                    },
                     confirmButton = {
-                        TextButton(
-                            onClick = {
-                                val date = String.format("%04d-%02d-%02d", expYear, expMonth + 1, expDay)
-                                expiryDate = date
+                        TextButton(onClick = {
+                            state.selectedDateMillis?.let {
+                                expiryDate = millisToIsoDate(it)
                                 expiryDateError = false
                                 showPredictionTip = false
-                                showExpiryDatePicker = false
                             }
-                        ) {
-                            Text("OK", color = GreenDark)
-                        }
+                            showExpiryDatePicker = false
+                        }) { Text("OK", color = GreenDark) }
                     },
                     dismissButton = {
                         TextButton(onClick = { showExpiryDatePicker = false }) {
                             Text("Cancelar", color = GreenDark)
                         }
                     }
-                )
+                ) {
+                    DatePicker(state = state, title = { Text("Fecha de vencimiento", modifier = Modifier.padding(16.dp), color = GreenDark) })
+                }
             }
 
             // Error general
@@ -453,4 +427,22 @@ fun AddItemScreen(
             Spacer(modifier = Modifier.height(16.dp))
         }
     }
+}
+
+// El DatePicker de Compose trabaja en epoch ms en UTC. Convertimos al
+// formato ISO `yyyy-MM-dd` que el backend espera.
+private fun parseDateMillisOrToday(dateStr: String): Long {
+    return try {
+        if (dateStr.isBlank()) {
+            LocalDate.now().atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+        } else {
+            LocalDate.parse(dateStr).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+        }
+    } catch (e: Exception) {
+        LocalDate.now().atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+    }
+}
+
+private fun millisToIsoDate(millis: Long): String {
+    return Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate().format(DATE_FORMAT)
 }
