@@ -59,6 +59,9 @@ import com.app.secondserving.ui.scan.ReviewScanScreen
 import com.app.secondserving.ui.scan.ScanReceiptScreen
 import com.app.secondserving.ui.scan.ScanViewModel
 import com.app.secondserving.ui.scan.ScanViewModelFactory
+import com.app.secondserving.ui.analytics.RecipeImpactScreen
+import com.app.secondserving.ui.analytics.RecipeImpactViewModel
+import com.app.secondserving.ui.analytics.RecipeImpactViewModelFactory
 import com.app.secondserving.ui.segment.UserSegmentScreen
 import com.app.secondserving.ui.segment.UserSegmentViewModel
 import com.app.secondserving.ui.segment.UserSegmentViewModelFactory
@@ -124,6 +127,7 @@ fun MyApplicationApp() {
     var selectedItemTip by remember { mutableStateOf("") }
     var selectedRecipe by remember { mutableStateOf<com.app.secondserving.data.network.Recipe?>(null) }
     var showUserSegment by remember { mutableStateOf(false) }
+    var showRecipeImpact by remember { mutableStateOf(false) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -173,6 +177,9 @@ fun MyApplicationApp() {
     val userSegmentViewModel: UserSegmentViewModel = viewModel(
         factory = UserSegmentViewModelFactory(analyticsRepository)
     )
+    val recipeImpactViewModel: RecipeImpactViewModel = viewModel(
+        factory = RecipeImpactViewModelFactory(analyticsRepository)
+    )
     val scanViewModel: ScanViewModel = viewModel(
         factory = ScanViewModelFactory(
             ReceiptScanner(context.applicationContext),
@@ -204,6 +211,7 @@ fun MyApplicationApp() {
         enabled = selectedItem != null ||
             selectedRecipe != null ||
             showUserSegment ||
+            showRecipeImpact ||
             showScanReceipt ||
             showAddItem ||
             scanReviewState.items.isNotEmpty() ||
@@ -213,6 +221,7 @@ fun MyApplicationApp() {
             selectedItem != null -> selectedItem = null
             selectedRecipe != null -> selectedRecipe = null
             showUserSegment -> showUserSegment = false
+            showRecipeImpact -> showRecipeImpact = false
             // PRIORIDAD 1: cámara ? volvemos a Agregar manual y limpiamos estado
             showScanReceipt -> {
                 scanViewModel.resetReviewState()
@@ -267,6 +276,15 @@ fun MyApplicationApp() {
         UserSegmentScreen(
             viewModel = userSegmentViewModel,
             onNavigateBack = { showUserSegment = false }
+        )
+        return
+    }
+
+    // 2.6. Pantalla de impacto en waste por categoría (BQ T3.2)
+    if (showRecipeImpact) {
+        RecipeImpactScreen(
+            viewModel = recipeImpactViewModel,
+            onNavigateBack = { showRecipeImpact = false }
         )
         return
     }
@@ -371,6 +389,7 @@ fun MyApplicationApp() {
                     userName = SessionManager(context).getFullName().orEmpty(),
                     onNavigateToProfile = { currentDestination = AppDestinations.PERFIL },
                     onNavigateToSegment = { showUserSegment = true },
+                    onNavigateToImpact = { showRecipeImpact = true },
                     isOnline = isOnline
                 )
                 AppDestinations.DESPENSA -> InventoryScreen(

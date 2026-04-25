@@ -88,6 +88,7 @@ fun HomeScreen(
     userName: String,
     onNavigateToProfile: () -> Unit = {},
     onNavigateToSegment: () -> Unit = {},
+    onNavigateToImpact: () -> Unit = {},
     isOnline: Boolean = true
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -118,12 +119,66 @@ fun HomeScreen(
 
         UserSegmentTeaserCard(onClick = onNavigateToSegment)
 
+        RecipeImpactTeaserCard(onClick = onNavigateToImpact)
+
             ComerPrimeroSection(
                 state = inventoryState,
                 onRetry = { inventoryViewModel.loadInventory() }
             )
 
             PlanDeHoySection()
+        }
+    }
+}
+
+// Card teaser que abre la pantalla de impacto de waste por categoría
+// (BQ T3.2). La pantalla destino hace su propio fetch.
+@Composable
+private fun RecipeImpactTeaserCard(onClick: () -> Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = CardColor),
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = Color(0xFFFFE0B2),
+                modifier = Modifier.size(48.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(text = "📈", fontSize = 22.sp)
+                }
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Impacto en tu despensa",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TextPrimary
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "Distribución del waste por categoría",
+                    fontSize = 12.sp,
+                    color = TextSecondary
+                )
+            }
+            Text(
+                text = "›",
+                fontSize = 22.sp,
+                color = GreenDark,
+                fontWeight = FontWeight.Bold
+            )
         }
     }
 }
