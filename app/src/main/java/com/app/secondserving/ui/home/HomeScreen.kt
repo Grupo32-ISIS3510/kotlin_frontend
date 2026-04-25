@@ -85,7 +85,8 @@ fun HomeScreen(
     viewModel: HomeViewModel,
     inventoryViewModel: InventoryViewModel,
     userName: String,
-    onNavigateToProfile: () -> Unit = {}
+    onNavigateToProfile: () -> Unit = {},
+    onNavigateToSegment: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val inventoryState by inventoryViewModel.uiState.collectAsState()
@@ -108,12 +109,66 @@ fun HomeScreen(
 
         SavingsCard(state = uiState, onRetry = { viewModel.loadSavings() })
 
+        UserSegmentTeaserCard(onClick = onNavigateToSegment)
+
         ComerPrimeroSection(
             state = inventoryState,
             onRetry = { inventoryViewModel.loadInventory() }
         )
 
         PlanDeHoySection()
+    }
+}
+
+// Card teaser que abre la pantalla completa de UserSegment (BQ T4.1).
+// No hace fetch propio: la pantalla destino lo hace al montarse.
+@Composable
+private fun UserSegmentTeaserCard(onClick: () -> Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = CardColor),
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = Beige,
+                modifier = Modifier.size(48.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(text = "📊", fontSize = 22.sp)
+                }
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Tu perfil de impacto",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TextPrimary
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "Ver tu segmento como usuario",
+                    fontSize = 12.sp,
+                    color = TextSecondary
+                )
+            }
+            Text(
+                text = "›",
+                fontSize = 22.sp,
+                color = GreenDark,
+                fontWeight = FontWeight.Bold
+            )
+        }
     }
 }
 

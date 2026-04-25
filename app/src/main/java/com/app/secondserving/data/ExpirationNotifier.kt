@@ -15,6 +15,8 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.app.secondserving.MainActivity
 import com.app.secondserving.data.local.FoodItemEntity
+// AnalyticsRepository vive en el mismo paquete (com.app.secondserving.data),
+// no necesita import explícito.
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
@@ -36,6 +38,16 @@ class ExpirationNotifier(private val context: Context) {
 
     private val prefs: SharedPreferences =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+    // El AnalyticsRepository se inyecta tarde porque ExpirationNotifier se
+    // construye en SecondServingApp.onCreate antes que el repo. Si nunca se
+    // setea, el logging es no-op (lo cual está bien — no rompe la
+    // notificación).
+    private var analyticsRepository: AnalyticsRepository? = null
+
+    fun setAnalyticsRepository(repo: AnalyticsRepository) {
+        analyticsRepository = repo
+    }
 
     fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -130,6 +142,15 @@ class ExpirationNotifier(private val context: Context) {
             .build()
 
         NotificationManagerCompat.from(context).notify(item.id.hashCode(), notification)
+        // Registramos notification_received en el backend (entrada de la
+        // BQ T4.1: open_rate = opened / received).
+        analyticsRepository?.logNotificationReceived(
+            mapOf(
+                "source" to "expiration_notifier",
+                "item_id" to item.id,
+                "days_remaining" to daysRemaining
+            )
+        )
         return true
     }
 

@@ -37,6 +37,18 @@ interface ApiService {
         @Query("year") year: Int? = null
     ): Response<SavingsAnalyticsResponse>
 
+    // BQ T4.1 — el backend ya computa el segmento del usuario (Proactive /
+    // Neutral / Passive) leyendo recipe_interactions y analytics_events de
+    // los últimos 30 días. Solo lo consumimos.
+    @GET("analytics/segment")
+    suspend fun getUserSegment(): Response<UserSegmentResponse>
+
+    // Ingesta de eventos del cliente. Lo usamos para registrar
+    // notification_received y notification_opened (entrada que necesita la
+    // BQ T4.1 para calcular el open_rate).
+    @POST("analytics/events")
+    suspend fun postAnalyticsEvents(@Body batch: AnalyticsEventBatch): Response<Unit>
+
     // Recipe Endpoints
     // El backend computa los matches con el inventario en el servidor
     // y devuelve directamente la lista de recetas sugeridas.
