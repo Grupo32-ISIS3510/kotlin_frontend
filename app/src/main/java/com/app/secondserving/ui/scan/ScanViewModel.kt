@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.app.secondserving.data.scan.ReceiptScanner
 import com.app.secondserving.data.ShelfLifePredictor
 import com.app.secondserving.data.InventoryRepository
+import com.app.secondserving.data.ProductRegistryManager
 import com.app.secondserving.data.network.InventoryItemRequest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -68,7 +69,6 @@ class ScanViewModel(
                 if (result.error != null) {
                     _uiState.value = ScanUiState.Error(result.error)
                 } else if (result.items.isEmpty()) {
-                    // Alerta cuando no se detecta nada correctamente
                     _uiState.value = ScanUiState.Error("No se detectaron productos en la factura. Intenta tomar la foto con mejor iluminación o más cerca.")
                 } else {
                     val purchaseDate = result.purchaseDate ?: LocalDate.now().toString()
@@ -83,7 +83,6 @@ class ScanViewModel(
                         )
                     }
                     
-                    // Actualizar el estado de revisión (SSOT)
                     _reviewState.update { it.copy(
                         items = editableItems,
                         detectedPurchaseDate = result.purchaseDate,
@@ -109,7 +108,23 @@ class ScanViewModel(
         }
     }
 
+    /**
+     * Restablece la fecha de vencimiento a la calculada inicialmente por el sistema.
+     */
+    fun resetExpiryDate(index: Int) {
+        _reviewState.update { state ->
+            val newList = state.items.toMutableList()
+            if (index in newList.indices) {
+                val item = newList[index]
+                val predictedExpiry = ShelfLifePredictor.predictExpiryDate(item.purchaseDate, item.category)
+                newList[index] = item.copy(expiryDate = predictedExpiry)
+                state.copy(items = newList)
+            } else state
+        }
+    }
+
     fun removeItem(index: Int) {
+        // Se mantiene la función por consistencia, pero se evita su uso en la UI según requerimiento.
         _reviewState.update { state ->
             val newList = state.items.toMutableList()
             if (index in newList.indices) {
@@ -132,15 +147,20 @@ class ScanViewModel(
     }
 
     fun saveScannedItems() {
-        val requests = getInventoryRequests()
-
-        if (requests.isEmpty()) return
+        val currentItems = _reviewState.value.items
+        if (currentItems.isEmpty()) return
 
         viewModelScope.launch {
             _reviewState.update { it.copy(isSaving = true, saveError = null) }
             try {
+                // Registrar cada producto por categoría usando el nuevo Manager en Dispatchers.IO
+                currentItems.forEach { item ->
+                    ProductRegistryManager.registerProduct(item.category)
+                }
+
                 // Aquí iría la llamada al repositorio si no es nulo
-                // inventoryRepository?.addItems(requests)
+                // inventoryRepository?.addItems(getInventoryRequests())
+
                 _reviewState.update { it.copy(isSaving = false, saveSuccess = true) }
             } catch (e: Exception) {
                 _reviewState.update { it.copy(isSaving = false, saveError = e.message ?: "Error al guardar") }

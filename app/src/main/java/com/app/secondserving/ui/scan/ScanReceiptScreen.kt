@@ -33,6 +33,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.app.secondserving.data.BackNavigationVerifier
+import kotlinx.coroutines.launch
 import java.io.File
 
 private val GreenDark = Color(0xFF386641)
@@ -47,6 +49,7 @@ fun ScanReceiptScreen(
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
 
     var hasCameraPermission by remember {
         mutableStateOf(
@@ -137,7 +140,10 @@ fun ScanReceiptScreen(
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
+                    IconButton(onClick = {
+                        scope.launch { BackNavigationVerifier.trackBackFromScanReceipt() }
+                        onNavigateBack()
+                    }) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack, 
                             contentDescription = "Volver",
@@ -360,13 +366,13 @@ private fun CameraPreview(
                 outputOptions,
                 ContextCompat.getMainExecutor(context),
                 object : ImageCapture.OnImageSavedCallback {
-                    override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
+                    override fun onImageSaved(output: ImageCapture.OutputFileResults) {
                         onImageCaptured(Uri.fromFile(file))
                         onCaptureHandled()
                     }
 
-                    override fun onError(exception: ImageCaptureException) {
-                        Log.e("CameraPreview", "Error al capturar imagen", exception)
+                    override fun onError(exc: ImageCaptureException) {
+                        Log.e("CameraPreview", "Error al capturar imagen", exc)
                         onCaptureHandled()
                     }
                 }

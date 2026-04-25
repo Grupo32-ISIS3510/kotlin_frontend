@@ -1,5 +1,7 @@
 package com.app.secondserving.ui.inventory
 
+import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -22,7 +24,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.app.secondserving.data.BackNavigationVerifier
 import com.app.secondserving.data.ShelfLifePredictor
+import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -31,6 +35,7 @@ private val BackgroundColor = Color(0xFFF5F5F0)
 private val CATEGORIES = listOf("Frutas", "Verduras", "Lácteos", "Carnes", "Otros")
 private val DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd")
 
+@RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddItemScreen(
@@ -39,6 +44,7 @@ fun AddItemScreen(
     onOpenScanner: (() -> Unit)? = null
 ) {
     val addItemState by viewModel.addItemState.collectAsState()
+    val scope = rememberCoroutineScope()
 
     var name by rememberSaveable { mutableStateOf("") }
     var category by rememberSaveable { mutableStateOf("Frutas") }
@@ -76,6 +82,8 @@ fun AddItemScreen(
     // Navegar atrás al éxito (una sola vez)
     LaunchedEffect(addItemState) {
         if (addItemState is AddItemUiState.Success) {
+            // Cancelar tracking background al guardar con éxito (Caso 1 ítem)
+            BackNavigationVerifier.cancelAllTracking()
             onNavigateBack()
             viewModel.resetAddItemState()
         }
@@ -104,7 +112,10 @@ fun AddItemScreen(
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
+                    IconButton(onClick = {
+                        scope.launch { BackNavigationVerifier.trackBackFromAddItem() }
+                        onNavigateBack()
+                    }) {
                         Icon(
                             Icons.Default.ArrowBack, 
                             contentDescription = "Volver",
@@ -158,7 +169,6 @@ fun AddItemScreen(
         ) {
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Nombre
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it; nameError = false },
