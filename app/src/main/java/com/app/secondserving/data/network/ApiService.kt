@@ -59,6 +59,14 @@ interface ApiService {
     @GET("analytics/segment")
     suspend fun getUserSegment(): Response<UserSegmentResponse>
 
+    // BQ T3.2 — waste agregado por mes y categoría. La pantalla
+    // RecipeImpactScreen agrupa los items por categoría y usa las
+    // observaciones mensuales para construir un box plot.
+    @GET("analytics/waste")
+    suspend fun getWasteAnalytics(
+        @Query("months") months: Int = 3
+    ): Response<List<WasteAnalyticsItem>>
+
     // Ingesta de eventos del cliente. Lo usamos para registrar
     // notification_received y notification_opened (entrada que necesita la
     // BQ T4.1 para calcular el open_rate).
