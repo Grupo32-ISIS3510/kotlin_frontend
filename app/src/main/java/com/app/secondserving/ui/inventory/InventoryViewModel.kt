@@ -223,6 +223,57 @@ class InventoryViewModel(
     fun resetAddItemState() {
         _addItemState.value = AddItemUiState.Idle
     }
+
+    // ── Consume / Discard ────────────────────────────────────────────────────
+    //
+    // El usuario decide si un alimento se aprovechó (consume) o se perdió
+    // (discard con razón). El backend distingue ambos casos en
+    // inventory_events y eso alimenta tanto saved_cop / wasted_cop como la
+    // BQ T3.2 (impacto de recetas en reducción de waste por categoría).
+
+    private val _actionState = MutableStateFlow<ItemActionState>(ItemActionState.Idle)
+    val actionState: StateFlow<ItemActionState> = _actionState.asStateFlow()
+
+    fun consumeItem(itemId: String) {
+        viewModelScope.launch {
+            _actionState.value = ItemActionState.Loading
+            when (val result = repository.consumeInventoryItem(itemId)) {
+                is Result.Success -> {
+                    _actionState.value = ItemActionState.Success
+                    loadInventory(showLoading = false)
+                }
+                is Result.Error -> {
+                    _actionState.value = ItemActionState.Error(getUserFriendlyMessage(result.exception))
+                }
+            }
+        }
+    }
+
+    fun discardItem(itemId: String, reason: String) {
+        viewModelScope.launch {
+            _actionState.value = ItemActionState.Loading
+            when (val result = repository.discardInventoryItem(itemId, reason)) {
+                is Result.Success -> {
+                    _actionState.value = ItemActionState.Success
+                    loadInventory(showLoading = false)
+                }
+                is Result.Error -> {
+                    _actionState.value = ItemActionState.Error(getUserFriendlyMessage(result.exception))
+                }
+            }
+        }
+    }
+
+    fun resetActionState() {
+        _actionState.value = ItemActionState.Idle
+    }
+}
+
+sealed class ItemActionState {
+    object Idle : ItemActionState()
+    object Loading : ItemActionState()
+    object Success : ItemActionState()
+    data class Error(val message: String) : ItemActionState()
 }
 
 class InventoryViewModelFactory(

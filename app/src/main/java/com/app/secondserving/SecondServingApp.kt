@@ -5,6 +5,7 @@ import android.util.Log
 import com.app.secondserving.data.AnalyticsRepository
 import com.app.secondserving.data.ExpirationNotifier
 import com.app.secondserving.data.InventoryRepository
+import com.app.secondserving.data.NetworkMonitor
 import com.app.secondserving.data.SavingsCache
 import com.app.secondserving.data.SessionManager
 import com.app.secondserving.data.local.AppDatabase
@@ -36,6 +37,12 @@ class SecondServingApp : Application() {
     lateinit var analyticsRepository: AnalyticsRepository
         private set
 
+    // NetworkMonitor singleton: la UI lo observa (banner offline) y se
+    // expone para que más adelante AnalyticsSyncWorker reaccione cuando
+    // vuelva la red. Vive durante toda la vida del proceso.
+    lateinit var networkMonitor: NetworkMonitor
+        private set
+
     override fun onCreate() {
         super.onCreate()
         sessionManager = SessionManager(this)
@@ -49,6 +56,7 @@ class SecondServingApp : Application() {
         // los ViewModels que necesitan llamar al backend (UserSegmentViewModel).
         analyticsRepository = AnalyticsRepository()
         expirationNotifier.setAnalyticsRepository(analyticsRepository)
+        networkMonitor = NetworkMonitor(this)
         ExpirationCheckWorker.enqueueDaily(this)
         registerFcmTokenIfLoggedIn()
     }
