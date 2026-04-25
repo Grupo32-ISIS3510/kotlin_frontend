@@ -107,7 +107,9 @@ fun MyApplicationApp() {
         it as? ComponentActivity
     }?.application as? SecondServingApp
 
-    // database se necesita para RecipeRepository y como fallback del repositorio compartido
+    // database se usa como fallback del repositorio compartido de inventario.
+    // (RecipeRepository ya no lo necesita: ahora consume /recipes/suggestions del
+    // backend, que hace el matching de ingredientes en el servidor.)
     val database = com.app.secondserving.data.local.AppDatabase.getDatabase(context.applicationContext)
 
     // El repositorio compartido garantiza que SavingsCache sea la misma instancia
@@ -125,7 +127,7 @@ fun MyApplicationApp() {
         factory = HomeViewModelFactory(sharedRepository)
     )
     val recipeViewModel: RecipeViewModel = viewModel(
-        factory = RecipeViewModelFactory(RecipeRepository(database))
+        factory = RecipeViewModelFactory(RecipeRepository())
     )
     val scanViewModel: ScanViewModel = viewModel(
         factory = ScanViewModelFactory(
