@@ -40,6 +40,12 @@ class RecipeViewModel(private val repository: RecipeRepository) : ViewModel() {
     private val _cookState = MutableStateFlow<CookUiState>(CookUiState.Idle)
     val cookState: StateFlow<CookUiState> = _cookState.asStateFlow()
 
+    // Detalle completo de la receta seleccionada (ingredientes + instrucciones).
+    // El listado /suggestions no los trae, así que la pantalla de detalle hace
+    // un fetch a /recipes/{id} cuando se monta y observa este StateFlow.
+    private val _selectedRecipeDetail = MutableStateFlow<Recipe?>(null)
+    val selectedRecipeDetail: StateFlow<Recipe?> = _selectedRecipeDetail.asStateFlow()
+
     init {
         fetchRecipes()
     }
@@ -116,5 +122,30 @@ class RecipeViewModel(private val repository: RecipeRepository) : ViewModel() {
         viewModelScope.launch {
             repository.viewRecipe(recipeId)
         }
+    }
+
+    /**
+     * Carga el detalle completo de la receta seleccionada (ingredientes e
+     * instrucciones, que /suggestions no trae). La pantalla de detalle observa
+     * `selectedRecipeDetail` y muestra los datos cuando llegan; mientras tanto
+     * usa el `Recipe` liviano que recibió como argumento.
+     */
+    fun loadRecipeDetail(recipeId: String) {
+        viewModelScope.launch {
+            // Limpiamos el detalle anterior para evitar mezclar recetas si el
+            // usuario navega rápido entre tarjetas.
+            _selectedRecipeDetail.value = null
+            when (val result = repository.getRecipeDetail(recipeId)) {
+                is Result.Success -> _selectedRecipeDetail.value = result.data
+                is Result.Error -> {
+                    // Sin error UI: si falla, la pantalla sigue mostrando el
+                    // recipe del listado. No queremos bloquear al usuario.
+                }
+            }
+        }
+    }
+
+    fun clearRecipeDetail() {
+        _selectedRecipeDetail.value = null
     }
 }

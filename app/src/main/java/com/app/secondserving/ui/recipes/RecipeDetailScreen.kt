@@ -32,12 +32,25 @@ fun RecipeDetailScreen(
     // SSOT: Observamos el estado de la acción de cocinar desde el ViewModel
     val cookState by viewModel.cookState.collectAsStateWithLifecycle(initialValue = CookUiState.Idle)
 
+    // El listado /suggestions no incluye ingredients ni instructions, por eso
+    // pedimos el detalle completo en cuanto se monta la pantalla. Mientras
+    // llega seguimos mostrando el `recipe` liviano que recibimos como argumento.
+    val detail by viewModel.selectedRecipeDetail.collectAsStateWithLifecycle()
+    val displayRecipe = detail ?: recipe
+
     // Registra la visualización de la receta en el backend (recipe_interactions).
     // Necesario para la BQ T4.1: el segmento del usuario depende del open_rate,
     // y para distinguir Proactive vs Passive el backend cuenta tanto views como cooks.
     // Solo logueamos si el id no viene null (recetas sin id no se pueden referenciar).
     LaunchedEffect(recipe.id) {
-        recipe.id?.let { viewModel.viewRecipe(it) }
+        recipe.id?.let {
+            viewModel.viewRecipe(it)
+            viewModel.loadRecipeDetail(it)
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose { viewModel.clearRecipeDetail() }
     }
 
     var showDialog by remember { mutableStateOf(false) }
@@ -94,7 +107,7 @@ fun RecipeDetailScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(recipe.title ?: "Sin título", fontWeight = FontWeight.Bold, color = GreenDark) },
+                title = { Text(displayRecipe.title ?: "Sin título", fontWeight = FontWeight.Bold, color = GreenDark) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         // Corregido: Usar versión AutoMirrored
@@ -113,7 +126,7 @@ fun RecipeDetailScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp)
         ) {
-            recipe.description?.let {
+            displayRecipe.description?.let {
                 Text(
                     text = it,
                     fontSize = 16.sp,
@@ -136,8 +149,8 @@ fun RecipeDetailScreen(
                 colors = CardDefaults.cardColors(containerColor = Color.White)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    val ingredients = recipe.ingredients.orEmpty()
-                    val matched = recipe.matched_ingredients.orEmpty()
+                    val ingredients = displayRecipe.ingredients.orEmpty()
+                    val matched = displayRecipe.matched_ingredients.orEmpty()
                     if (ingredients.isEmpty()) {
                         Text(
                             text = "Esta receta no trae ingredientes detallados.",
@@ -190,7 +203,7 @@ fun RecipeDetailScreen(
                 colors = CardDefaults.cardColors(containerColor = Color.White)
             ) {
                 Text(
-                    text = recipe.instructions ?: "No hay instrucciones disponibles.",
+                    text = displayRecipe.instructions ?: "No hay instrucciones disponibles.",
                     modifier = Modifier.padding(16.dp),
                     fontSize = 15.sp,
                     lineHeight = 22.sp
@@ -200,11 +213,11 @@ fun RecipeDetailScreen(
             Spacer(modifier = Modifier.height(32.dp))
 
             Button(
-                onClick = { recipe.id?.let { viewModel.cookRecipe(it) } },
+                onClick = { displayRecipe.id?.let { viewModel.cookRecipe(it) } },
                 modifier = Modifier.fillMaxWidth().height(56.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = GreenDark),
                 shape = RoundedCornerShape(12.dp),
-                enabled = cookState !is CookUiState.Loading && recipe.id != null
+                enabled = cookState !is CookUiState.Loading && displayRecipe.id != null
             ) {
                 if (cookState is CookUiState.Loading) {
                     CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
