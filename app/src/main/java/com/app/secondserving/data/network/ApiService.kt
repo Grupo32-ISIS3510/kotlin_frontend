@@ -37,10 +37,27 @@ interface ApiService {
         @Query("year") year: Int? = null
     ): Response<SavingsAnalyticsResponse>
 
-    // Recipe Endpoints - Updated to handle direct list response
+    // Recipe Endpoints
+    // El backend computa los matches con el inventario en el servidor
+    // y devuelve directamente la lista de recetas sugeridas.
     @GET("recipes/suggestions")
     suspend fun getRecipes(): Response<List<Recipe>>
 
-    @POST("recipes/{id}/cook")
-    suspend fun cookRecipe(@Path("id") recipeId: String): Response<Unit>
+    // Registra una interacción del usuario con una receta (action = "viewed" | "cooked").
+    // Antes era POST /recipes/{id}/cook (sin body) — ese endpoint no existe en
+    // el backend del equipo y por eso cookRecipe era un stub vacío. Ahora se usa
+    // /interact con un body que diferencia ver vs cocinar; eso pobla la tabla
+    // recipe_interactions que necesita la BQ T4.1 para distinguir Passive vs
+    // Proactive users.
+    @POST("recipes/{id}/interact")
+    suspend fun interactWithRecipe(
+        @Path("id") recipeId: String,
+        @Body request: RecipeInteractionRequest
+    ): Response<Unit>
+
+    // Endpoint anterior: lo dejé comentado como referencia. No existía en el
+    // backend, por eso cookRecipe en el repo era un stub que devolvía Success
+    // sin hacer ninguna llamada de red.
+    // @POST("recipes/{id}/cook")
+    // suspend fun cookRecipe(@Path("id") recipeId: String): Response<Unit>
 }

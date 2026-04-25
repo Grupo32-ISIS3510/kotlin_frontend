@@ -31,7 +31,14 @@ fun RecipeDetailScreen(
 ) {
     // SSOT: Observamos el estado de la acción de cocinar desde el ViewModel
     val cookState by viewModel.cookState.collectAsStateWithLifecycle(initialValue = CookUiState.Idle)
-    
+
+    // Registra la visualización de la receta en el backend (recipe_interactions).
+    // Necesario para la BQ T4.1: el segmento del usuario depende del open_rate,
+    // y para distinguir Proactive vs Passive el backend cuenta tanto views como cooks.
+    LaunchedEffect(recipe.id) {
+        viewModel.viewRecipe(recipe.id)
+    }
+
     var showDialog by remember { mutableStateOf(false) }
     var dialogMessage by remember { mutableStateOf("") }
     var isSuccess by remember { mutableStateOf(false) }

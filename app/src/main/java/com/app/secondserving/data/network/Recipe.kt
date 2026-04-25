@@ -16,3 +16,10 @@ data class RecipeIngredient(
     val quantity: String,
     val unit: String?
 )
+
+// Body que espera POST /recipes/{id}/interact en el backend.
+// action solo puede ser "viewed" o "cooked"; el backend lo valida y rechaza
+// cualquier otro valor con 422.
+data class RecipeInteractionRequest(
+    val action: String
+)

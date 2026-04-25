@@ -100,4 +100,15 @@ class RecipeViewModel(private val repository: RecipeRepository) : ViewModel() {
     fun clearError() {
         _uiState.update { it.copy(error = null) }
     }
+
+    // Registra que el usuario abrió el detalle de una receta. El backend lo
+    // guarda en recipe_interactions con action="viewed". Es fire-and-forget:
+    // no exponemos estado UI porque al usuario no le interesa el resultado
+    // de este log; cualquier fallo de red queda silencioso (en Rama 2 esto
+    // pasará por la cola offline de analytics_events para sobrevivir process death).
+    fun viewRecipe(recipeId: String) {
+        viewModelScope.launch {
+            repository.viewRecipe(recipeId)
+        }
+    }
 }
