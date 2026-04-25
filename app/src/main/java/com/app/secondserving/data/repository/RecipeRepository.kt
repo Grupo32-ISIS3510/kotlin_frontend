@@ -95,7 +95,7 @@ class RecipeRepository(
         } ?: emptyList()
 
         return Recipe(
-            id = er.uri?.hashCode() ?: 0,
+            id = er.uri ?: "",
             title = er.label ?: "Sin título",
             description = er.cuisineType?.firstOrNull() ?: er.dishType?.firstOrNull(),
             instructions = "Ver receta completa en: ${er.url}\n\nIngredientes necesarios:\n" + (er.ingredientLines?.joinToString("\n") ?: ""),
@@ -106,5 +106,5 @@ class RecipeRepository(
         )
     }
 
-    suspend fun cookRecipe(recipeId: Int): Result<Unit> = Result.Success(Unit)
+    suspend fun cookRecipe(recipeId: String): Result<Unit> = Result.Success(Unit)
 }

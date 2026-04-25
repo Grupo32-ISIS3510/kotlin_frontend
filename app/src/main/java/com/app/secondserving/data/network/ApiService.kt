@@ -42,5 +42,5 @@ interface ApiService {
     suspend fun getRecipes(): Response<List<Recipe>>
 
     @POST("recipes/{id}/cook")
-    suspend fun cookRecipe(@Path("id") recipeId: Int): Response<Unit>
+    suspend fun cookRecipe(@Path("id") recipeId: String): Response<Unit>
 }

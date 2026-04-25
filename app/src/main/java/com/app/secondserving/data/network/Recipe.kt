@@ -1,7 +1,7 @@
 package com.app.secondserving.data.network
 
 data class Recipe(
-    val id: Int,
+    val id: String,
     val title: String,
     val description: String?,
     val instructions: String?, // Or steps

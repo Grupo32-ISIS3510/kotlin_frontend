@@ -70,7 +70,7 @@ class RecipeViewModel(private val repository: RecipeRepository) : ViewModel() {
         }
     }
 
-    fun cookRecipe(recipeId: Int) {
+    fun cookRecipe(recipeId: String) {
         viewModelScope.launch {
             _cookState.value = CookUiState.Loading
             _uiState.update { it.copy(isCooking = true) }
