@@ -2,8 +2,10 @@ package com.app.secondserving
 
 import android.app.Application
 import android.util.Log
+import com.app.secondserving.data.AnalyticsRepository
 import com.app.secondserving.data.ExpirationNotifier
 import com.app.secondserving.data.InventoryRepository
+import com.app.secondserving.data.SavingsCache
 import com.app.secondserving.data.SessionManager
 import com.app.secondserving.data.local.AppDatabase
 import com.app.secondserving.data.network.RetrofitClient
@@ -31,14 +33,22 @@ class SecondServingApp : Application() {
     lateinit var expirationNotifier: ExpirationNotifier
         private set
 
+    lateinit var analyticsRepository: AnalyticsRepository
+        private set
+
     override fun onCreate() {
         super.onCreate()
         sessionManager = SessionManager(this)
         database = AppDatabase.getDatabase(this)
         RetrofitClient.init(sessionManager)
-        inventoryRepository = InventoryRepository(database)
+        inventoryRepository = InventoryRepository(database, savingsCache = SavingsCache(this))
         expirationNotifier = ExpirationNotifier(this)
         expirationNotifier.createNotificationChannel()
+        // analyticsRepository es singleton: lo comparten MainActivity (notification_opened),
+        // ExpirationNotifier y SecondServingMessagingService (notification_received), y
+        // los ViewModels que necesitan llamar al backend (UserSegmentViewModel).
+        analyticsRepository = AnalyticsRepository()
+        expirationNotifier.setAnalyticsRepository(analyticsRepository)
         ExpirationCheckWorker.enqueueDaily(this)
         registerFcmTokenIfLoggedIn()
     }

@@ -19,19 +19,18 @@ class InventoryServiceAdapter(
     suspend fun getInventory(): Result<List<FoodItemEntity>> {
         return try {
             val response = apiService.getInventory()
-            if (response.isSuccessful) {
-                // Ahora response.body() es directamente List<InventoryItem>
-                val items = response.body()?.map { it.toEntity() }
-                if (items != null) {
+            when {
+                response.isSuccessful -> {
+                    // El back devuelve {"items":[...],"total":N} — usamos .items
+                    val items = response.body()?.items?.map { it.toEntity() } ?: emptyList()
                     Result.Success(items)
-                } else {
+                }
+                response.code() == 404 -> {
+                    // 404 = usuario sin inventario aún (cuenta nueva)
                     Result.Success(emptyList())
                 }
-            } else {
-                Result.Error(
-                    IOException(
-                        "Error fetching inventory: ${response.code()} ${response.message()}"
-                    )
+                else -> Result.Error(
+                    IOException("Error fetching inventory: ${response.code()} ${response.message()}")
                 )
             }
         } catch (e: Exception) {
@@ -107,6 +106,29 @@ class InventoryServiceAdapter(
             }
         } catch (e: Exception) {
             Result.Error(IOException("Error updating item", e))
+        }
+    }
+
+    /**
+     * Obtiene métricas de ahorro para el dashboard de inicio.
+     */
+    suspend fun getSavingsAnalytics(month: Int? = null, year: Int? = null): Result<SavingsAnalyticsResponse> {
+        return try {
+            val response = apiService.getSavingsAnalytics(month = month, year = year)
+            if (response.isSuccessful) {
+                val analytics = response.body()
+                if (analytics != null) {
+                    Result.Success(analytics)
+                } else {
+                    Result.Error(IOException("Empty response body from server"))
+                }
+            } else {
+                Result.Error(
+                    IOException("Error fetching savings analytics: ${response.code()} ${response.message()}")
+                )
+            }
+        } catch (e: Exception) {
+            Result.Error(IOException("Error fetching savings analytics", e))
         }
     }
 }

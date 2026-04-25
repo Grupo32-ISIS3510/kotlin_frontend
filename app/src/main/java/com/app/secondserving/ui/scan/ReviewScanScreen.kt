@@ -1,6 +1,10 @@
 package com.app.secondserving.ui.scan
 
+import android.app.DatePickerDialog
+import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -8,13 +12,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -23,12 +28,15 @@ import com.app.secondserving.data.BackNavigationVerifier
 import com.app.secondserving.data.ProductRegistryManager
 import com.app.secondserving.data.ShelfLifePredictor
 import kotlinx.coroutines.launch
+import java.time.LocalDate
+import java.util.Locale
 
 private val GreenDark = Color(0xFF386641)
 private val BackgroundColor = Color(0xFFF5F5F0)
 private val CATEGORIES = listOf("Frutas", "Verduras", "Lácteos", "Carnes", "Granos", "Bebidas", "Enlatados", "Otros")
 private const val MAX_NAME_LENGTH = 35
 
+@RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReviewScanScreen(
@@ -82,9 +90,6 @@ fun ReviewScanScreen(
                             item = item,
                             onUpdate = { updatedItem ->
                                 viewModel.updateItem(index, updatedItem)
-                            },
-                            onResetExpiry = {
-                                viewModel.resetExpiryDate(index)
                             }
                         )
                     }
@@ -123,14 +128,15 @@ fun ReviewScanScreen(
     }
 }
 
+@RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReviewItemCard(
     item: EditableScannedItem,
-    onUpdate: (EditableScannedItem) -> Unit,
-    onResetExpiry: () -> Unit
+    onUpdate: (EditableScannedItem) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
     val textFieldColors = OutlinedTextFieldDefaults.colors(
         focusedBorderColor = GreenDark,
@@ -144,6 +150,25 @@ fun ReviewItemCard(
         errorBorderColor = Color(0xFFC62828),
         errorLabelColor = Color(0xFFC62828)
     )
+
+    // Función para mostrar el selector de fecha nativo
+    val showDatePicker = {
+        val currentDate = try {
+            LocalDate.parse(item.expiryDate)
+        } catch (e: Exception) {
+            LocalDate.now()
+        }
+        DatePickerDialog(
+            context,
+            { _, year, month, dayOfMonth ->
+                val date = String.format(Locale.US, "%04d-%02d-%02d", year, month + 1, dayOfMonth)
+                onUpdate(item.copy(expiryDate = date))
+            },
+            currentDate.year,
+            currentDate.monthValue - 1,
+            currentDate.dayOfMonth
+        ).show()
+    }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -227,25 +252,37 @@ fun ReviewItemCard(
                 }
             }
 
-            OutlinedTextField(
-                value = item.expiryDate,
-                onValueChange = {},
-                readOnly = true,
-                label = { Text("Vencimiento (Restaurar con ícono)", fontSize = 11.sp) },
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                trailingIcon = {
-                    IconButton(onClick = onResetExpiry) {
-                        Icon(
-                            Icons.Default.Refresh, 
-                            contentDescription = "Restaurar fecha inicial", 
-                            tint = GreenDark, 
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                },
-                colors = textFieldColors,
-                textStyle = LocalTextStyle.current.copy(fontSize = 12.sp)
-            )
+            Box(modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp)
+                .clickable { showDatePicker() }
+            ) {
+                OutlinedTextField(
+                    value = item.expiryDate,
+                    onValueChange = {},
+                    readOnly = true,
+                    enabled = false, // Deshabilitamos para que el click lo maneje el Box
+                    label = { Text("Vencimiento", fontSize = 11.sp) },
+                    modifier = Modifier.fillMaxWidth(),
+                    trailingIcon = {
+                        IconButton(onClick = { showDatePicker() }) {
+                            Icon(
+                                Icons.Default.CalendarToday, 
+                                contentDescription = "Seleccionar fecha",
+                                tint = GreenDark,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        disabledBorderColor = GreenDark.copy(alpha = 0.5f),
+                        disabledLabelColor = GreenDark,
+                        disabledTextColor = GreenDark,
+                        disabledTrailingIconColor = GreenDark
+                    ),
+                    textStyle = LocalTextStyle.current.copy(fontSize = 12.sp)
+                )
+            }
         }
     }
 }

@@ -9,7 +9,9 @@ import retrofit2.converter.gson.GsonConverterFactory
 object RetrofitClient {
 
     private const val BASE_URL = "http://3.16.198.192/api/v1/"
-    private const val EDAMAM_BASE_URL = "https://api.edamam.com/"
+
+    // EDAMAM_BASE_URL ya no se usa: las recetas vienen del backend del equipo.
+    // private const val EDAMAM_BASE_URL = "https://api.edamam.com/"
 
     private val logging = HttpLoggingInterceptor().apply {
         level = HttpLoggingInterceptor.Level.BODY
@@ -19,16 +21,17 @@ object RetrofitClient {
         .addInterceptor(logging)
         .build()
 
-    // Cliente específico para Edamam con el Header requerido
-    private val edamamClient = OkHttpClient.Builder()
-        .addInterceptor(logging)
-        .addInterceptor { chain ->
-            val request = chain.request().newBuilder()
-                .addHeader("Edamam-Account-User", "arnulfo_user")
-                .build()
-            chain.proceed(request)
-        }
-        .build()
+    // El cliente con el header Edamam-Account-User dejó de usarse cuando
+    // migramos a /recipes/suggestions del backend (ver RecipeRepository).
+    // private val edamamClient = OkHttpClient.Builder()
+    //     .addInterceptor(logging)
+    //     .addInterceptor { chain ->
+    //         val request = chain.request().newBuilder()
+    //             .addHeader("Edamam-Account-User", "arnulfo_user")
+    //             .build()
+    //         chain.proceed(request)
+    //     }
+    //     .build()
 
     // Cliente sin autenticación — login y register
     val publicInstance: ApiService by lazy {
@@ -40,15 +43,16 @@ object RetrofitClient {
             .create(ApiService::class.java)
     }
 
-    // Cliente para Edamam (Recetas en Español)
-    val edamamInstance: EdamamService by lazy {
-        Retrofit.Builder()
-            .baseUrl(EDAMAM_BASE_URL)
-            .addConverterFactory(GsonConverterFactory.create())
-            .client(edamamClient) // Usamos el cliente con el header
-            .build()
-            .create(EdamamService::class.java)
-    }
+    // Instancia Retrofit para Edamam — desactivada porque ahora las
+    // recetas vienen del backend del equipo a través de authInstance.
+    // val edamamInstance: EdamamService by lazy {
+    //     Retrofit.Builder()
+    //         .baseUrl(EDAMAM_BASE_URL)
+    //         .addConverterFactory(GsonConverterFactory.create())
+    //         .client(edamamClient)
+    //         .build()
+    //         .create(EdamamService::class.java)
+    // }
 
     // Cliente autenticado — todos los endpoints protegidos
     lateinit var authInstance: ApiService

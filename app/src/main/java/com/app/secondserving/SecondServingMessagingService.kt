@@ -42,6 +42,14 @@ class SecondServingMessagingService : FirebaseMessagingService() {
         val body = message.notification?.body ?: "Tienes alimentos próximos a vencer"
 
         showNotification(title, body)
+
+        // Registramos notification_received en el backend para alimentar la
+        // BQ T4.1 (open_rate = opened / received).
+        runCatching {
+            (applicationContext as? SecondServingApp)?.analyticsRepository?.logNotificationReceived(
+                mapOf("source" to "fcm", "title" to title)
+            )
+        }
     }
 
     private fun showNotification(title: String, body: String) {

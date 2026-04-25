@@ -5,6 +5,7 @@ import com.app.secondserving.data.local.FoodItemDao
 import com.app.secondserving.data.local.FoodItemEntity
 import com.app.secondserving.data.network.InventoryItemRequest
 import com.app.secondserving.data.network.InventoryServiceAdapter
+import com.app.secondserving.data.network.SavingsAnalyticsResponse
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 
@@ -17,7 +18,8 @@ import kotlinx.coroutines.flow.first
  */
 class InventoryRepository(
     private val database: AppDatabase,
-    private val serviceAdapter: InventoryServiceAdapter = InventoryServiceAdapter()
+    private val serviceAdapter: InventoryServiceAdapter = InventoryServiceAdapter(),
+    private val savingsCache: SavingsCache? = null
 ) {
     companion object {
         private const val INVENTORY_CACHE_TTL_MS = 24 * 60 * 60 * 1000L
@@ -103,7 +105,6 @@ class InventoryRepository(
             val remoteResult = serviceAdapter.createInventoryItem(request)
             when (remoteResult) {
                 is Result.Success -> {
-                    // Guardar en caché local
                     dao.insertItem(remoteResult.data)
                     remoteResult
                 }
@@ -116,6 +117,8 @@ class InventoryRepository(
 
     /**
      * Actualiza un item existente.
+     * Invalida la caché de ahorro porque un cambio de estado (ej. consumido)
+     * modifica el cálculo del período.
      */
     suspend fun updateInventoryItem(item: FoodItemEntity): Result<FoodItemEntity> {
         return try {
@@ -124,6 +127,7 @@ class InventoryRepository(
             when (remoteResult) {
                 is Result.Success -> {
                     dao.updateItem(updatedItem)
+                    savingsCache?.invalidate()
                     remoteResult
                 }
                 is Result.Error -> remoteResult
@@ -135,6 +139,8 @@ class InventoryRepository(
 
     /**
      * Elimina un item del inventario.
+     * Invalida la caché de ahorro porque el alimento puede haberse consumido
+     * o descartado, lo que cambia saved_cop / wasted_cop del período.
      */
     suspend fun deleteInventoryItem(itemId: String): Result<Unit> {
         return try {
@@ -142,6 +148,7 @@ class InventoryRepository(
             when (remoteResult) {
                 is Result.Success -> {
                     dao.deleteItemById(itemId)
+                    savingsCache?.invalidate()
                     remoteResult
                 }
                 is Result.Error -> remoteResult
@@ -171,5 +178,41 @@ class InventoryRepository(
      */
     suspend fun syncInventory(): Result<List<FoodItemEntity>> {
         return getInventory(forceRefresh = true)
+    }
+
+    // ── Gestión de sesión ────────────────────────────────────────────────────
+
+    /**
+     * Elimina todos los datos locales del usuario actual.
+     * Debe llamarse justo antes de navegar al login para que el siguiente
+     * usuario no vea inventario ni analíticas del anterior.
+     */
+    suspend fun clearUserData() {
+        dao.deleteAllItems()
+        savingsCache?.clear()
+    }
+
+    // ── Analytics de ahorro ──────────────────────────────────────────────────
+
+    /**
+     * Devuelve los datos de ahorro almacenados en caché si todavía son válidos
+     * (TTL de 24 h y mismo período mes/año).
+     *
+     * Es una función síncrona: SharedPreferences ya está en memoria y es seguro
+     * llamarla desde el hilo principal sin coroutine.
+     */
+    fun getCachedSavingsAnalytics(month: Int, year: Int): SavingsAnalyticsResponse? =
+        savingsCache?.get(month, year)
+
+    /**
+     * Obtiene analíticas de ahorro desde la red y las almacena en caché.
+     * Solo llamar cuando la caché no tiene datos válidos.
+     */
+    suspend fun getSavingsAnalytics(month: Int, year: Int): Result<SavingsAnalyticsResponse> {
+        val result = serviceAdapter.getSavingsAnalytics(month = month, year = year)
+        if (result is Result.Success) {
+            savingsCache?.put(month, year, result.data)
+        }
+        return result
     }
 }

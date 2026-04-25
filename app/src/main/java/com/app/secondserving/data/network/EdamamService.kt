@@ -1,5 +1,19 @@
 package com.app.secondserving.data.network
 
+// Cliente de la API pública de Edamam para recetas en español.
+//
+// Este archivo dejó de usarse el 2026-04-24. La app ya no llama a Edamam:
+// ahora consume el endpoint /recipes/suggestions del backend del equipo
+// (ver RecipeRepository y ApiService). El motivo del cambio está explicado
+// con detalle en el header de RecipeRepository.kt.
+//
+// Conservo el archivo entero comentado por si en el futuro hay que revisar
+// la firma original de las llamadas o restaurar el cliente Edamam como
+// fallback. Si llegamos a borrarlo del todo, hay que confirmar primero
+// que ningún caller sigue refiriéndose a EdamamService, EdamamResponse,
+// EdamamHit, EdamamRecipe ni EdamamIngredient.
+
+/*
 import retrofit2.Response
 import retrofit2.http.GET
 import retrofit2.http.Header
@@ -47,3 +61,4 @@ data class EdamamIngredient(
     val foodCategory: String?,
     val image: String?
 )
+*/

@@ -1,4 +1,4 @@
-package com.app.secondserving
+﻿package com.app.secondserving
 
 import android.content.Intent
 import android.os.Build
@@ -16,27 +16,31 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.List
-import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.app.secondserving.data.InventoryRepository
+import com.app.secondserving.data.SavingsCache
 import com.app.secondserving.data.SessionManager
+import com.app.secondserving.ui.home.HomeScreen
+import com.app.secondserving.ui.home.HomeViewModel
+import com.app.secondserving.ui.home.HomeViewModelFactory
 import com.app.secondserving.data.scan.ReceiptScanner
 import com.app.secondserving.ui.inventory.AddItemScreen
 import com.app.secondserving.ui.inventory.ExpiredAlertPreferences
@@ -55,16 +59,47 @@ import com.app.secondserving.ui.scan.ReviewScanScreen
 import com.app.secondserving.ui.scan.ScanReceiptScreen
 import com.app.secondserving.ui.scan.ScanViewModel
 import com.app.secondserving.ui.scan.ScanViewModelFactory
+import com.app.secondserving.ui.segment.UserSegmentScreen
+import com.app.secondserving.ui.segment.UserSegmentViewModel
+import com.app.secondserving.ui.segment.UserSegmentViewModelFactory
 import com.app.secondserving.ui.theme.MyApplicationTheme
+import com.app.secondserving.data.AnalyticsRepository
 import com.app.secondserving.data.repository.RecipeRepository
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // Si la activity se abrió desde una notificación, registramos
+        // notification_opened en el backend (entrada para la BQ T4.1).
+        // Soporta tanto la notificación local del ExpirationNotifier
+        // (extra "expiring_item_id") como las push de FCM
+        // (extra EXTRA_NAVIGATE_TO de SecondServingMessagingService).
+        logNotificationOpenedIfFromIntent()
         setContent {
             MyApplicationTheme {
                 MyApplicationApp()
+            }
+        }
+    }
+
+    private fun logNotificationOpenedIfFromIntent() {
+        val app = application as? SecondServingApp ?: return
+        val analytics: AnalyticsRepository = app.analyticsRepository
+        intent?.let { i ->
+            when {
+                i.hasExtra("expiring_item_id") -> analytics.logNotificationOpened(
+                    mapOf(
+                        "source" to "expiration_notifier",
+                        "item_id" to (i.getStringExtra("expiring_item_id") ?: "")
+                    )
+                )
+                i.hasExtra(SecondServingMessagingService.EXTRA_NAVIGATE_TO) -> analytics.logNotificationOpened(
+                    mapOf(
+                        "source" to "fcm",
+                        "navigate_to" to (i.getStringExtra(SecondServingMessagingService.EXTRA_NAVIGATE_TO) ?: "")
+                    )
+                )
             }
         }
     }
@@ -72,25 +107,24 @@ class MainActivity : ComponentActivity() {
 
 enum class AppDestinations(val label: String, val icon: ImageVector) {
     INICIO("Inicio", Icons.Default.Home),
-    DESPENSA("Despensa", Icons.Default.List),
-    RECETAS("Recetas", Icons.Default.MenuBook),
+    DESPENSA("Despensa", Icons.AutoMirrored.Filled.List),
+    RECETAS("Recetas", Icons.AutoMirrored.Filled.MenuBook),
     PERFIL("Perfil", Icons.Default.AccountCircle),
 }
 
 @Composable
 fun MyApplicationApp() {
     val context = LocalContext.current
-    var currentDestination by rememberSaveable { mutableStateOf(AppDestinations.DESPENSA) }
+    var currentDestination by rememberSaveable { mutableStateOf(AppDestinations.INICIO) }
     var showAddItem by remember { mutableStateOf(false) }
     var showScanReceipt by remember { mutableStateOf(false) }
     var showLogoutDialog by remember { mutableStateOf(false) }
     var showPreferencesDialog by remember { mutableStateOf(false) }
     var selectedItem by remember { mutableStateOf<InventoryItemUi?>(null) }
     var selectedItemTip by remember { mutableStateOf("") }
-    
-    // Estado para recetas
     var selectedRecipe by remember { mutableStateOf<com.app.secondserving.data.network.Recipe?>(null) }
-    
+    var showUserSegment by remember { mutableStateOf(false) }
+
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { _ -> }
@@ -105,72 +139,97 @@ fun MyApplicationApp() {
         it as? ComponentActivity
     }?.application as? SecondServingApp
 
+    // database se usa como fallback del repositorio compartido de inventario.
+    // (RecipeRepository ya no lo necesita: ahora consume /recipes/suggestions del
+    // backend, que hace el matching de ingredientes en el servidor.)
     val database = com.app.secondserving.data.local.AppDatabase.getDatabase(context.applicationContext)
-    val inventoryRepo = app?.inventoryRepository ?: InventoryRepository(database)
 
-    val inventoryViewModel: InventoryViewModel = viewModel(
-        factory = InventoryViewModelFactory(inventoryRepo)
+    // El repositorio compartido garantiza que SavingsCache sea la misma instancia
+    // en InventoryViewModel y HomeViewModel, de modo que la invalidación al
+    // consumir/borrar un item sea visible inmediatamente al volver a Inicio.
+    val sharedRepository = app?.inventoryRepository ?: InventoryRepository(
+        database,
+        savingsCache = SavingsCache(context.applicationContext)
     )
 
-    // Inicializar ScanViewModel en este nivel para que sea compartido
+    val inventoryViewModel: InventoryViewModel = viewModel(
+        factory = InventoryViewModelFactory(sharedRepository, app?.expirationNotifier)
+    )
+    val homeViewModel: HomeViewModel = viewModel(
+        factory = HomeViewModelFactory(sharedRepository)
+    )
+    val recipeViewModel: RecipeViewModel = viewModel(
+        factory = RecipeViewModelFactory(RecipeRepository())
+    )
+    // Repository singleton para analytics: se reusa en MainActivity (logging)
+    // y en UserSegmentViewModel (consumo de /analytics/segment).
+    val analyticsRepository = app?.analyticsRepository ?: AnalyticsRepository()
+    val userSegmentViewModel: UserSegmentViewModel = viewModel(
+        factory = UserSegmentViewModelFactory(analyticsRepository)
+    )
     val scanViewModel: ScanViewModel = viewModel(
         factory = ScanViewModelFactory(
             ReceiptScanner(context.applicationContext),
-            inventoryRepo
+            sharedRepository
         )
     )
     val scanReviewState by scanViewModel.reviewState.collectAsStateWithLifecycle()
 
+    val coroutineScope = rememberCoroutineScope()
     val performLogout = {
-        SessionManager(context).clearSession()
-        val intent = Intent(context, LoginActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        coroutineScope.launch {
+            // 1. Borrar datos locales del usuario (Room + SavingsCache)
+            //    antes de limpiar el token, para garantizar que el
+            //    repositorio autenticado aún tiene acceso si lo necesita.
+            sharedRepository.clearUserData()
+            // 2. Borrar token y datos de sesión
+            SessionManager(context).clearSession()
+            // 3. Navegar al login en el hilo principal
+            val intent = Intent(context, LoginActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            }
+            context.startActivity(intent)
+            (context as? ComponentActivity)?.finish()
         }
-        context.startActivity(intent)
-        (context as? ComponentActivity)?.finish()
+        Unit
     }
 
-    // Lógica unificada para el botón de atrás
     BackHandler(
         enabled = selectedItem != null ||
-                selectedRecipe != null ||
-                showScanReceipt ||
-                showAddItem ||
-                scanReviewState.items.isNotEmpty() ||
-                currentDestination != AppDestinations.DESPENSA
+            selectedRecipe != null ||
+            showUserSegment ||
+            showScanReceipt ||
+            showAddItem ||
+            scanReviewState.items.isNotEmpty() ||
+            currentDestination != AppDestinations.INICIO
     ) {
         when {
             selectedItem != null -> selectedItem = null
             selectedRecipe != null -> selectedRecipe = null
-            
-            // PRIORIDAD 1: Si estamos en la cámara, volvemos a Agregar manual y LIMPIAMOS items
+            showUserSegment -> showUserSegment = false
+            // PRIORIDAD 1: cámara ? volvemos a Agregar manual y limpiamos estado
             showScanReceipt -> {
                 scanViewModel.resetReviewState()
                 scanViewModel.resetState()
                 showScanReceipt = false
                 showAddItem = true
             }
-
-            // PRIORIDAD 2: Si estamos en agregar manual, simplemente lo cerramos
-            showAddItem -> {
-                showAddItem = false
-            }
-
-            // PRIORIDAD 3: Si hay items (revisión), volvemos a la cámara para re-intentar
+            // PRIORIDAD 2: agregar manual ? simplemente lo cerramos
+            showAddItem -> showAddItem = false
+            // PRIORIDAD 3: revisión de factura ? volvemos a la cámara
             scanReviewState.items.isNotEmpty() -> {
                 scanViewModel.resetState()
                 showScanReceipt = true
             }
-
-            currentDestination != AppDestinations.DESPENSA -> {
-                currentDestination = AppDestinations.DESPENSA
+            currentDestination != AppDestinations.INICIO -> {
+                currentDestination = AppDestinations.INICIO
             }
         }
     }
 
-    // JERARQUÍA DE RENDERIZADO (Prioridad de Overlays)
+    // ?? JERARQUÍA DE RENDERIZADO (orden de prioridad de overlays) ??????????
 
-    // 1. Detalles (Item o Receta)
+    // 1. Detalle de item de inventario
     if (selectedItem != null) {
         val weatherVm: WeatherViewModel = viewModel()
         ItemDetailScreen(
@@ -182,10 +241,8 @@ fun MyApplicationApp() {
         return
     }
 
+    // 2. Detalle de receta
     if (selectedRecipe != null) {
-        val recipeViewModel: RecipeViewModel = viewModel(
-            factory = RecipeViewModelFactory(RecipeRepository(database))
-        )
         RecipeDetailScreen(
             recipe = selectedRecipe!!,
             viewModel = recipeViewModel,
@@ -194,17 +251,23 @@ fun MyApplicationApp() {
         return
     }
 
-    // 2. Escáner de Factura (Cámara)
+    // 2.5. Pantalla de segmento de usuario (BQ T4.1)
+    if (showUserSegment) {
+        UserSegmentScreen(
+            viewModel = userSegmentViewModel,
+            onNavigateBack = { showUserSegment = false }
+        )
+        return
+    }
+
+    // 3. cámara (escaneo de factura)
     if (showScanReceipt) {
         ScanReceiptScreen(
             viewModel = scanViewModel,
             onItemsScanned = { _, _ ->
-                // Al terminar el escaneo, cerramos cámara. 
-                // Esto hará que caiga en la pantalla de revisión (Prioridad 4)
                 showScanReceipt = false
             },
-            onNavigateBack = { 
-                // Al dar atrás desde la cámara, limpiamos estado y vamos a manual
+            onNavigateBack = {
                 scanViewModel.resetReviewState()
                 scanViewModel.resetState()
                 showScanReceipt = false
@@ -214,7 +277,7 @@ fun MyApplicationApp() {
         return
     }
 
-    // 3. Agregar Item Manual
+    // 4. Agregar item manual
     if (showAddItem) {
         AddItemScreen(
             viewModel = inventoryViewModel,
@@ -227,7 +290,7 @@ fun MyApplicationApp() {
         return
     }
 
-    // 4. Revisión de Factura (Solo si hay items y no estamos en los overlays superiores)
+    // 5. revisión de factura (solo si hay items escaneados)
     if (scanReviewState.items.isNotEmpty()) {
         ReviewScanScreen(
             viewModel = scanViewModel,
@@ -240,14 +303,13 @@ fun MyApplicationApp() {
                 currentDestination = AppDestinations.DESPENSA
             },
             onNavigateBack = {
-                // Al dar atrás desde revisión, volvemos a la cámara
                 showScanReceipt = true
             }
         )
         return
     }
 
-    // 5. Flujo Principal (BottomBar)
+    // 6. Pantalla principal con BottomBar
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         bottomBar = {
@@ -292,6 +354,13 @@ fun MyApplicationApp() {
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding)) {
             when (currentDestination) {
+                AppDestinations.INICIO -> HomeScreen(
+                    viewModel = homeViewModel,
+                    inventoryViewModel = inventoryViewModel,
+                    userName = SessionManager(context).getFullName().orEmpty(),
+                    onNavigateToProfile = { currentDestination = AppDestinations.PERFIL },
+                    onNavigateToSegment = { showUserSegment = true }
+                )
                 AppDestinations.DESPENSA -> InventoryScreen(
                     viewModel = inventoryViewModel,
                     onItemClick = { item, tip ->
@@ -299,11 +368,7 @@ fun MyApplicationApp() {
                         selectedItemTip = tip
                     }
                 )
-                AppDestinations.INICIO -> WelcomeScreen()
                 AppDestinations.RECETAS -> {
-                    val recipeViewModel: RecipeViewModel = viewModel(
-                        factory = RecipeViewModelFactory(RecipeRepository(database))
-                    )
                     RecipeScreen(
                         viewModel = recipeViewModel,
                         onRecipeClick = { recipe -> selectedRecipe = recipe }
@@ -363,13 +428,6 @@ fun MyApplicationApp() {
                 }
             }
         )
-    }
-}
-
-@Composable
-private fun PlaceholderScreen(name: String) {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text(text = name, style = MaterialTheme.typography.headlineMedium, color = Color.Gray)
     }
 }
 
@@ -534,51 +592,10 @@ private fun ProfileOptionRow(
                 modifier = Modifier.weight(1f)
             )
             Text(
-                text = "›",
+                text = "?",
                 fontSize = 20.sp,
                 color = greenDark
             )
         }
-    }
-}
-
-@Composable
-private fun WelcomeScreen() {
-    val greenDark = Color(0xFF386641)
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.White)
-            .padding(horizontal = 32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Surface(
-            shape = CircleShape,
-            color = Color(0xFFE8F5E9),
-            modifier = Modifier.size(120.dp)
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Text(text = "🌱", fontSize = 56.sp)
-            }
-        }
-        Spacer(modifier = Modifier.height(32.dp))
-        Text(
-            text = "Bienvenido a SecondServing",
-            fontSize = 28.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color(0xFF1A1A1A),
-            textAlign = TextAlign.Center,
-            lineHeight = 34.sp
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            text = "La solución perfecta para evitar el desperdicio y cuidar tu bolsillo",
-            fontSize = 16.sp,
-            color = greenDark,
-            textAlign = TextAlign.Center,
-            lineHeight = 22.sp,
-            fontWeight = FontWeight.Medium
-        )
     }
 }
