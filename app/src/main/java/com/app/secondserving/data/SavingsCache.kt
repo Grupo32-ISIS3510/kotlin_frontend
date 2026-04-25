@@ -81,6 +81,14 @@ class SavingsCache(context: Context) {
         prefs.edit().putLong(KEY_CACHED_AT, 0L).apply()
     }
 
+    /**
+     * Borra completamente la caché. Se llama al cerrar sesión para que el
+     * siguiente usuario no vea datos del anterior.
+     */
+    fun clear() {
+        prefs.edit().clear().apply()
+    }
+
     /** Indica si la caché está vigente para el período dado. */
     fun isValid(month: Int, year: Int): Boolean = get(month, year) != null
 }

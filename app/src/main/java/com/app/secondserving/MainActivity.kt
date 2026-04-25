@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -134,13 +135,23 @@ fun MyApplicationApp() {
     )
     val scanReviewState by scanViewModel.reviewState.collectAsStateWithLifecycle()
 
+    val coroutineScope = rememberCoroutineScope()
     val performLogout = {
-        SessionManager(context).clearSession()
-        val intent = Intent(context, LoginActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        coroutineScope.launch {
+            // 1. Borrar datos locales del usuario (Room + SavingsCache)
+            //    antes de limpiar el token, para garantizar que el
+            //    repositorio autenticado aún tiene acceso si lo necesita.
+            sharedRepository.clearUserData()
+            // 2. Borrar token y datos de sesión
+            SessionManager(context).clearSession()
+            // 3. Navegar al login en el hilo principal
+            val intent = Intent(context, LoginActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            }
+            context.startActivity(intent)
+            (context as? ComponentActivity)?.finish()
         }
-        context.startActivity(intent)
-        (context as? ComponentActivity)?.finish()
+        Unit
     }
 
     BackHandler(
