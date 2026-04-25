@@ -109,6 +109,29 @@ class InventoryServiceAdapter(
             Result.Error(IOException("Error updating item", e))
         }
     }
+
+    /**
+     * Obtiene métricas de ahorro para el dashboard de inicio.
+     */
+    suspend fun getSavingsAnalytics(month: Int? = null, year: Int? = null): Result<SavingsAnalyticsResponse> {
+        return try {
+            val response = apiService.getSavingsAnalytics(month = month, year = year)
+            if (response.isSuccessful) {
+                val analytics = response.body()
+                if (analytics != null) {
+                    Result.Success(analytics)
+                } else {
+                    Result.Error(IOException("Empty response body from server"))
+                }
+            } else {
+                Result.Error(
+                    IOException("Error fetching savings analytics: ${response.code()} ${response.message()}")
+                )
+            }
+        } catch (e: Exception) {
+            Result.Error(IOException("Error fetching savings analytics", e))
+        }
+    }
 }
 
 /**

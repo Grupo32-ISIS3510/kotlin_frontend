@@ -4,6 +4,7 @@ import android.app.Application
 import android.util.Log
 import com.app.secondserving.data.ExpirationNotifier
 import com.app.secondserving.data.InventoryRepository
+import com.app.secondserving.data.SavingsCache
 import com.app.secondserving.data.SessionManager
 import com.app.secondserving.data.local.AppDatabase
 import com.app.secondserving.data.network.RetrofitClient
@@ -36,7 +37,7 @@ class SecondServingApp : Application() {
         sessionManager = SessionManager(this)
         database = AppDatabase.getDatabase(this)
         RetrofitClient.init(sessionManager)
-        inventoryRepository = InventoryRepository(database)
+        inventoryRepository = InventoryRepository(database, savingsCache = SavingsCache(this))
         expirationNotifier = ExpirationNotifier(this)
         expirationNotifier.createNotificationChannel()
         ExpirationCheckWorker.enqueueDaily(this)
