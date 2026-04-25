@@ -7,11 +7,14 @@ import androidx.lifecycle.viewModelScope
 import com.app.secondserving.data.scan.ReceiptScanner
 import com.app.secondserving.data.ShelfLifePredictor
 import com.app.secondserving.data.InventoryRepository
+import com.app.secondserving.data.ProductRegistryManager
+import com.app.secondserving.data.NetworkMonitor
 import com.app.secondserving.data.network.InventoryItemRequest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
@@ -51,7 +54,8 @@ data class EditableScannedItem(
 
 class ScanViewModel(
     private val scanner: ReceiptScanner,
-    private val inventoryRepository: InventoryRepository? = null
+    private val inventoryRepository: InventoryRepository? = null,
+    private val networkMonitor: NetworkMonitor? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<ScanUiState>(ScanUiState.Idle)
@@ -68,7 +72,6 @@ class ScanViewModel(
                 if (result.error != null) {
                     _uiState.value = ScanUiState.Error(result.error)
                 } else if (result.items.isEmpty()) {
-                    // Alerta cuando no se detecta nada correctamente
                     _uiState.value = ScanUiState.Error("No se detectaron productos en la factura. Intenta tomar la foto con mejor iluminación o más cerca.")
                 } else {
                     val purchaseDate = result.purchaseDate ?: LocalDate.now().toString()
@@ -83,7 +86,6 @@ class ScanViewModel(
                         )
                     }
                     
-                    // Actualizar el estado de revisión (SSOT)
                     _reviewState.update { it.copy(
                         items = editableItems,
                         detectedPurchaseDate = result.purchaseDate,
@@ -104,6 +106,21 @@ class ScanViewModel(
             val newList = state.items.toMutableList()
             if (index in newList.indices) {
                 newList[index] = updatedItem
+                state.copy(items = newList)
+            } else state
+        }
+    }
+
+    /**
+     * Restablece la fecha de vencimiento a la calculada inicialmente por el sistema.
+     */
+    fun resetExpiryDate(index: Int) {
+        _reviewState.update { state ->
+            val newList = state.items.toMutableList()
+            if (index in newList.indices) {
+                val item = newList[index]
+                val predictedExpiry = ShelfLifePredictor.predictExpiryDate(item.purchaseDate, item.category)
+                newList[index] = item.copy(expiryDate = predictedExpiry)
                 state.copy(items = newList)
             } else state
         }
@@ -131,16 +148,25 @@ class ScanViewModel(
         }
     }
 
+    /**
+     * Procede con el guardado. Ahora permite soporte OFFLINE al delegar
+     * la lógica de red al ProductRegistryManager y al repositorio.
+     */
     fun saveScannedItems() {
-        val requests = getInventoryRequests()
-
-        if (requests.isEmpty()) return
+        val currentItems = _reviewState.value.items
+        if (currentItems.isEmpty()) return
 
         viewModelScope.launch {
             _reviewState.update { it.copy(isSaving = true, saveError = null) }
             try {
-                // Aquí iría la llamada al repositorio si no es nulo
-                // inventoryRepository?.addItems(requests)
+                // Registrar cada producto por categoría.
+                // ProductRegistryManager maneja internamente si hay red o no para el log.
+                currentItems.forEach { item ->
+                    ProductRegistryManager.registerProduct(item.category, networkMonitor)
+                }
+
+                // El éxito aquí dispara el callback en la UI que llama al
+                // inventoryRepository.createInventoryItems, el cual ya tiene soporte offline.
                 _reviewState.update { it.copy(isSaving = false, saveSuccess = true) }
             } catch (e: Exception) {
                 _reviewState.update { it.copy(isSaving = false, saveError = e.message ?: "Error al guardar") }
@@ -152,6 +178,10 @@ class ScanViewModel(
         _uiState.value = ScanUiState.Idle
     }
     
+    /**
+     * Limpia completamente el estado de revisión, incluyendo la lista de items.
+     * Esto es crucial para evitar bucles de navegación en la MainActivity.
+     */
     fun resetReviewState() {
         _reviewState.value = ScanReviewState()
     }
@@ -164,12 +194,13 @@ class ScanViewModel(
 
 class ScanViewModelFactory(
     private val scanner: ReceiptScanner,
-    private val inventoryRepository: InventoryRepository? = null
+    private val inventoryRepository: InventoryRepository? = null,
+    private val networkMonitor: NetworkMonitor? = null
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(ScanViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return ScanViewModel(scanner, inventoryRepository) as T
+            return ScanViewModel(scanner, inventoryRepository, networkMonitor) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

@@ -1,7 +1,10 @@
 package com.app.secondserving.ui.scan
 
 import android.app.DatePickerDialog
+import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -10,7 +13,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CalendarToday
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -22,7 +24,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.app.secondserving.data.BackNavigationVerifier
+import com.app.secondserving.data.ProductRegistryManager
 import com.app.secondserving.data.ShelfLifePredictor
+import kotlinx.coroutines.launch
+import java.time.LocalDate
 import java.util.Locale
 
 private val GreenDark = Color(0xFF386641)
@@ -30,6 +36,7 @@ private val BackgroundColor = Color(0xFFF5F5F0)
 private val CATEGORIES = listOf("Frutas", "Verduras", "Lácteos", "Carnes", "Granos", "Bebidas", "Enlatados", "Otros")
 private const val MAX_NAME_LENGTH = 35
 
+@RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReviewScanScreen(
@@ -37,13 +44,13 @@ fun ReviewScanScreen(
     onConfirm: () -> Unit,
     onNavigateBack: () -> Unit
 ) {
-    // Usamos reviewState como SSOT para la edición de items
     val reviewState by viewModel.reviewState.collectAsStateWithLifecycle()
     val items = reviewState.items
+    val scope = rememberCoroutineScope()
 
-    // Efecto para navegar al guardar con éxito
     LaunchedEffect(reviewState.saveSuccess) {
         if (reviewState.saveSuccess) {
+            ProductRegistryManager.markSuccess()
             onConfirm()
             viewModel.resetReviewState()
         }
@@ -56,7 +63,10 @@ fun ReviewScanScreen(
                     Text("Revisar compra", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = GreenDark)
                 },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
+                    IconButton(onClick = {
+                        scope.launch { BackNavigationVerifier.trackBackFromReviewScan() }
+                        onNavigateBack()
+                    }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = GreenDark)
                     }
                 },
@@ -80,9 +90,6 @@ fun ReviewScanScreen(
                             item = item,
                             onUpdate = { updatedItem ->
                                 viewModel.updateItem(index, updatedItem)
-                            },
-                            onDelete = {
-                                viewModel.removeItem(index)
                             }
                         )
                     }
@@ -105,7 +112,6 @@ fun ReviewScanScreen(
                 }
             }
             
-            // Mostrar error si ocurre al guardar
             reviewState.saveError?.let { error ->
                 Snackbar(
                     modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp),
@@ -122,12 +128,12 @@ fun ReviewScanScreen(
     }
 }
 
+@RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReviewItemCard(
     item: EditableScannedItem,
-    onUpdate: (EditableScannedItem) -> Unit,
-    onDelete: () -> Unit
+    onUpdate: (EditableScannedItem) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -144,6 +150,25 @@ fun ReviewItemCard(
         errorBorderColor = Color(0xFFC62828),
         errorLabelColor = Color(0xFFC62828)
     )
+
+    // Función para mostrar el selector de fecha nativo
+    val showDatePicker = {
+        val currentDate = try {
+            LocalDate.parse(item.expiryDate)
+        } catch (e: Exception) {
+            LocalDate.now()
+        }
+        DatePickerDialog(
+            context,
+            { _, year, month, dayOfMonth ->
+                val date = String.format(Locale.US, "%04d-%02d-%02d", year, month + 1, dayOfMonth)
+                onUpdate(item.copy(expiryDate = date))
+            },
+            currentDate.year,
+            currentDate.monthValue - 1,
+            currentDate.dayOfMonth
+        ).show()
+    }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -162,7 +187,7 @@ fun ReviewItemCard(
                         }
                     },
                     label = { Text("Nombre", fontSize = 11.sp) },
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     colors = textFieldColors,
                     singleLine = true,
                     isError = isError,
@@ -184,9 +209,6 @@ fun ReviewItemCard(
                         }
                     }
                 )
-                IconButton(onClick = onDelete) {
-                    Icon(Icons.Default.Delete, contentDescription = "Eliminar", tint = Color(0xFFC62828))
-                }
             }
 
             Row(modifier = Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -230,30 +252,37 @@ fun ReviewItemCard(
                 }
             }
 
-            OutlinedTextField(
-                value = item.expiryDate,
-                onValueChange = {},
-                readOnly = true,
-                label = { Text("Vencimiento estimado", fontSize = 11.sp) },
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                trailingIcon = {
-                    IconButton(onClick = {
-                        val dateParts = item.expiryDate.split("-")
-                        val year = dateParts[0].toInt()
-                        val month = dateParts[1].toInt() - 1
-                        val day = dateParts[2].toInt()
-
-                        DatePickerDialog(context, { _, y, m, d ->
-                            val newDate = String.format(Locale.US, "%04d-%02d-%02d", y, m + 1, d)
-                            onUpdate(item.copy(expiryDate = newDate))
-                        }, year, month, day).show()
-                    }) {
-                        Icon(Icons.Default.CalendarToday, contentDescription = "Cambiar", tint = GreenDark, modifier = Modifier.size(20.dp))
-                    }
-                },
-                colors = textFieldColors,
-                textStyle = LocalTextStyle.current.copy(fontSize = 12.sp)
-            )
+            Box(modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp)
+                .clickable { showDatePicker() }
+            ) {
+                OutlinedTextField(
+                    value = item.expiryDate,
+                    onValueChange = {},
+                    readOnly = true,
+                    enabled = false, // Deshabilitamos para que el click lo maneje el Box
+                    label = { Text("Vencimiento", fontSize = 11.sp) },
+                    modifier = Modifier.fillMaxWidth(),
+                    trailingIcon = {
+                        IconButton(onClick = { showDatePicker() }) {
+                            Icon(
+                                Icons.Default.CalendarToday, 
+                                contentDescription = "Seleccionar fecha",
+                                tint = GreenDark,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        disabledBorderColor = GreenDark.copy(alpha = 0.5f),
+                        disabledLabelColor = GreenDark,
+                        disabledTextColor = GreenDark,
+                        disabledTrailingIconColor = GreenDark
+                    ),
+                    textStyle = LocalTextStyle.current.copy(fontSize = 12.sp)
+                )
+            }
         }
     }
 }
