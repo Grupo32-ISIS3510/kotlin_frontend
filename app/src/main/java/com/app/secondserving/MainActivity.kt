@@ -37,7 +37,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.app.secondserving.data.InventoryRepository
 import com.app.secondserving.data.SavingsCache
-import com.app.secondserving.data.ScannedItem
 import com.app.secondserving.data.SessionManager
 import com.app.secondserving.data.network.InventoryItemRequest
 import com.app.secondserving.ui.home.HomeScreen
@@ -93,8 +92,6 @@ fun MyApplicationApp() {
     var showPreferencesDialog by remember { mutableStateOf(false) }
     var selectedItem by remember { mutableStateOf<InventoryItemUi?>(null) }
     var selectedItemTip by remember { mutableStateOf("") }
-    
-    // Estado para recetas
     var selectedRecipe by remember { mutableStateOf<com.app.secondserving.data.network.Recipe?>(null) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -111,29 +108,30 @@ fun MyApplicationApp() {
         it as? ComponentActivity
     }?.application as? SecondServingApp
 
+    // database se necesita para RecipeRepository y como fallback del repositorio compartido
+    val database = com.app.secondserving.data.local.AppDatabase.getDatabase(context.applicationContext)
+
     // El repositorio compartido garantiza que SavingsCache sea la misma instancia
-    // en InventoryViewModel y HomeViewModel, de modo que la invalidación al
+    // en InventoryViewModel y HomeViewModel, de modo que la invalidaci?n al
     // consumir/borrar un item sea visible inmediatamente al volver a Inicio.
     val sharedRepository = app?.inventoryRepository ?: InventoryRepository(
-        com.app.secondserving.data.local.AppDatabase.getDatabase(context.applicationContext),
+        database,
         savingsCache = SavingsCache(context.applicationContext)
     )
-    val database = com.app.secondserving.data.local.AppDatabase.getDatabase(context.applicationContext)
-    val inventoryRepo = app?.inventoryRepository ?: InventoryRepository(database)
 
     val inventoryViewModel: InventoryViewModel = viewModel(
         factory = InventoryViewModelFactory(sharedRepository, app?.expirationNotifier)
     )
     val homeViewModel: HomeViewModel = viewModel(
         factory = HomeViewModelFactory(sharedRepository)
-        factory = InventoryViewModelFactory(inventoryRepo)
     )
-
-    // Inicializar ScanViewModel en este nivel para que sea compartido
+    val recipeViewModel: RecipeViewModel = viewModel(
+        factory = RecipeViewModelFactory(RecipeRepository(database))
+    )
     val scanViewModel: ScanViewModel = viewModel(
         factory = ScanViewModelFactory(
             ReceiptScanner(context.applicationContext),
-            inventoryRepo
+            sharedRepository
         )
     )
     val scanReviewState by scanViewModel.reviewState.collectAsStateWithLifecycle()
@@ -147,54 +145,40 @@ fun MyApplicationApp() {
         (context as? ComponentActivity)?.finish()
     }
 
-    // Lógica unificada para el botón de atrás
     BackHandler(
         enabled = selectedItem != null ||
-            itemsToReview != null ||
+            selectedRecipe != null ||
             showScanReceipt ||
             showAddItem ||
+            scanReviewState.items.isNotEmpty() ||
             currentDestination != AppDestinations.INICIO
-                selectedRecipe != null ||
-                showScanReceipt ||
-                showAddItem ||
-                scanReviewState.items.isNotEmpty() ||
-                currentDestination != AppDestinations.DESPENSA
     ) {
         when {
             selectedItem != null -> selectedItem = null
             selectedRecipe != null -> selectedRecipe = null
-
-            // PRIORIDAD 1: Si estamos en la cámara, volvemos a Agregar manual y LIMPIAMOS items
+            // PRIORIDAD 1: c?mara ? volvemos a Agregar manual y limpiamos estado
             showScanReceipt -> {
                 scanViewModel.resetReviewState()
                 scanViewModel.resetState()
                 showScanReceipt = false
                 showAddItem = true
             }
+            // PRIORIDAD 2: agregar manual ? simplemente lo cerramos
             showAddItem -> showAddItem = false
-            currentDestination != AppDestinations.INICIO -> {
-                currentDestination = AppDestinations.INICIO
-
-            // PRIORIDAD 2: Si estamos en agregar manual, simplemente lo cerramos
-            showAddItem -> {
-                showAddItem = false
-            }
-
-            // PRIORIDAD 3: Si hay items (revisión), volvemos a la cámara para re-intentar
+            // PRIORIDAD 3: revisi?n de factura ? volvemos a la c?mara
             scanReviewState.items.isNotEmpty() -> {
                 scanViewModel.resetState()
                 showScanReceipt = true
             }
-
-            currentDestination != AppDestinations.DESPENSA -> {
-                currentDestination = AppDestinations.DESPENSA
+            currentDestination != AppDestinations.INICIO -> {
+                currentDestination = AppDestinations.INICIO
             }
         }
     }
 
-    // JERARQUÍA DE RENDERIZADO (Prioridad de Overlays)
+    // ?? JERARQU?A DE RENDERIZADO (orden de prioridad de overlays) ??????????
 
-    // 1. Detalles (Item o Receta)
+    // 1. Detalle de item de inventario
     if (selectedItem != null) {
         val weatherVm: WeatherViewModel = viewModel()
         ItemDetailScreen(
@@ -206,16 +190,24 @@ fun MyApplicationApp() {
         return
     }
 
+    // 2. Detalle de receta
+    if (selectedRecipe != null) {
+        RecipeDetailScreen(
+            recipe = selectedRecipe!!,
+            viewModel = recipeViewModel,
+            onNavigateBack = { selectedRecipe = null }
+        )
+        return
+    }
+
+    // 3. C?mara (escaneo de factura)
     if (showScanReceipt) {
         ScanReceiptScreen(
             viewModel = scanViewModel,
             onItemsScanned = { _, _ ->
-                // Al terminar el escaneo, cerramos cámara.
-                // Esto hará que caiga en la pantalla de revisión (Prioridad 4)
                 showScanReceipt = false
             },
-            onNavigateBack = { 
-                // Al dar atrás desde la cámara, limpiamos estado y vamos a manual
+            onNavigateBack = {
                 scanViewModel.resetReviewState()
                 scanViewModel.resetState()
                 showScanReceipt = false
@@ -225,7 +217,7 @@ fun MyApplicationApp() {
         return
     }
 
-    // 3. Agregar Item Manual
+    // 4. Agregar item manual
     if (showAddItem) {
         AddItemScreen(
             viewModel = inventoryViewModel,
@@ -238,7 +230,7 @@ fun MyApplicationApp() {
         return
     }
 
-    // 4. Revisión de Factura (Solo si hay items y no estamos en los overlays superiores)
+    // 5. Revisi?n de factura (solo si hay items escaneados)
     if (scanReviewState.items.isNotEmpty()) {
         ReviewScanScreen(
             viewModel = scanViewModel,
@@ -251,14 +243,13 @@ fun MyApplicationApp() {
                 currentDestination = AppDestinations.DESPENSA
             },
             onNavigateBack = {
-                // Al dar atrás desde revisión, volvemos a la cámara
                 showScanReceipt = true
             }
         )
         return
     }
 
-    // 5. Flujo Principal (BottomBar)
+    // 6. Pantalla principal con BottomBar
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         bottomBar = {
@@ -303,6 +294,12 @@ fun MyApplicationApp() {
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding)) {
             when (currentDestination) {
+                AppDestinations.INICIO -> HomeScreen(
+                    viewModel = homeViewModel,
+                    inventoryViewModel = inventoryViewModel,
+                    userName = SessionManager(context).getFullName().orEmpty(),
+                    onNavigateToProfile = { currentDestination = AppDestinations.PERFIL }
+                )
                 AppDestinations.DESPENSA -> InventoryScreen(
                     viewModel = inventoryViewModel,
                     onItemClick = { item, tip ->
@@ -310,23 +307,12 @@ fun MyApplicationApp() {
                         selectedItemTip = tip
                     }
                 )
-                AppDestinations.INICIO -> WelcomeScreen()
                 AppDestinations.RECETAS -> {
-                    val recipeViewModel: RecipeViewModel = viewModel(
-                        factory = RecipeViewModelFactory(RecipeRepository(database))
-                    )
                     RecipeScreen(
                         viewModel = recipeViewModel,
                         onRecipeClick = { recipe -> selectedRecipe = recipe }
                     )
                 }
-                AppDestinations.INICIO -> HomeScreen(
-                    viewModel = homeViewModel,
-                    inventoryViewModel = inventoryViewModel,
-                    userName = SessionManager(context).getFullName().orEmpty(),
-                    onNavigateToProfile = { currentDestination = AppDestinations.PERFIL }
-                )
-                AppDestinations.RECETAS -> PlaceholderScreen("Recetas")
                 AppDestinations.PERFIL -> ProfileScreen(
                     onOpenPreferences = { showPreferencesDialog = true },
                     onLogout = { showLogoutDialog = true }
@@ -340,7 +326,7 @@ fun MyApplicationApp() {
             onDismissRequest = { showPreferencesDialog = false },
             title = { Text("Preferencias") },
             text = {
-                Text("Si seleccionas esta opción, el aviso de productos vencidos se mostrará siempre al entrar al inventario (se desactiva el \"no mostrar hoy\").")
+                Text("Si seleccionas esta opci?n, el aviso de productos vencidos se mostrar? siempre al entrar al inventario (se desactiva el \"no mostrar hoy\").")
             },
             confirmButton = {
                 TextButton(
@@ -363,8 +349,8 @@ fun MyApplicationApp() {
     if (showLogoutDialog) {
         AlertDialog(
             onDismissRequest = { showLogoutDialog = false },
-            title = { Text("Cerrar sesión") },
-            text = { Text("¿Seguro que quieres cerrar sesión?") },
+            title = { Text("Cerrar sesi?n") },
+            text = { Text("?Seguro que quieres cerrar sesi?n?") },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -372,7 +358,7 @@ fun MyApplicationApp() {
                         performLogout()
                     }
                 ) {
-                    Text("Cerrar sesión", color = Color(0xFFB71C1C))
+                    Text("Cerrar sesi?n", color = Color(0xFFB71C1C))
                 }
             },
             dismissButton = {
@@ -472,7 +458,7 @@ private fun ProfileScreen(
                 ProfileOptionRow(label = "Ayuda y soporte", greenDark = greenDark)
                 ProfileOptionRow(label = "Acerca de", greenDark = greenDark)
                 ProfileOptionRow(
-                    label = "Cerrar sesión",
+                    label = "Cerrar sesi?n",
                     greenDark = greenDark,
                     isDestructive = true,
                     onClick = onLogout
@@ -552,11 +538,10 @@ private fun ProfileOptionRow(
                 modifier = Modifier.weight(1f)
             )
             Text(
-                text = "›",
+                text = "?",
                 fontSize = 20.sp,
                 color = greenDark
             )
         }
     }
 }
-
