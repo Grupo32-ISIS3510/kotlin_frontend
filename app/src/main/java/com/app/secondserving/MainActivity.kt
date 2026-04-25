@@ -1,4 +1,4 @@
-package com.app.secondserving
+﻿package com.app.secondserving
 
 import android.content.Intent
 import android.os.Build
@@ -16,11 +16,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.List
-import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -30,7 +30,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -38,7 +37,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.app.secondserving.data.InventoryRepository
 import com.app.secondserving.data.SavingsCache
 import com.app.secondserving.data.SessionManager
-import com.app.secondserving.data.network.InventoryItemRequest
 import com.app.secondserving.ui.home.HomeScreen
 import com.app.secondserving.ui.home.HomeViewModel
 import com.app.secondserving.ui.home.HomeViewModelFactory
@@ -77,8 +75,8 @@ class MainActivity : ComponentActivity() {
 
 enum class AppDestinations(val label: String, val icon: ImageVector) {
     INICIO("Inicio", Icons.Default.Home),
-    DESPENSA("Despensa", Icons.Default.List),
-    RECETAS("Recetas", Icons.Default.MenuBook),
+    DESPENSA("Despensa", Icons.AutoMirrored.Filled.List),
+    RECETAS("Recetas", Icons.AutoMirrored.Filled.MenuBook),
     PERFIL("Perfil", Icons.Default.AccountCircle),
 }
 
@@ -112,7 +110,7 @@ fun MyApplicationApp() {
     val database = com.app.secondserving.data.local.AppDatabase.getDatabase(context.applicationContext)
 
     // El repositorio compartido garantiza que SavingsCache sea la misma instancia
-    // en InventoryViewModel y HomeViewModel, de modo que la invalidaci?n al
+    // en InventoryViewModel y HomeViewModel, de modo que la invalidación al
     // consumir/borrar un item sea visible inmediatamente al volver a Inicio.
     val sharedRepository = app?.inventoryRepository ?: InventoryRepository(
         database,
@@ -156,7 +154,7 @@ fun MyApplicationApp() {
         when {
             selectedItem != null -> selectedItem = null
             selectedRecipe != null -> selectedRecipe = null
-            // PRIORIDAD 1: c?mara ? volvemos a Agregar manual y limpiamos estado
+            // PRIORIDAD 1: cámara ? volvemos a Agregar manual y limpiamos estado
             showScanReceipt -> {
                 scanViewModel.resetReviewState()
                 scanViewModel.resetState()
@@ -165,7 +163,7 @@ fun MyApplicationApp() {
             }
             // PRIORIDAD 2: agregar manual ? simplemente lo cerramos
             showAddItem -> showAddItem = false
-            // PRIORIDAD 3: revisi?n de factura ? volvemos a la c?mara
+            // PRIORIDAD 3: revisión de factura ? volvemos a la cámara
             scanReviewState.items.isNotEmpty() -> {
                 scanViewModel.resetState()
                 showScanReceipt = true
@@ -176,7 +174,7 @@ fun MyApplicationApp() {
         }
     }
 
-    // ?? JERARQU?A DE RENDERIZADO (orden de prioridad de overlays) ??????????
+    // ?? JERARQUÍA DE RENDERIZADO (orden de prioridad de overlays) ??????????
 
     // 1. Detalle de item de inventario
     if (selectedItem != null) {
@@ -200,7 +198,7 @@ fun MyApplicationApp() {
         return
     }
 
-    // 3. C?mara (escaneo de factura)
+    // 3. cámara (escaneo de factura)
     if (showScanReceipt) {
         ScanReceiptScreen(
             viewModel = scanViewModel,
@@ -230,7 +228,7 @@ fun MyApplicationApp() {
         return
     }
 
-    // 5. Revisi?n de factura (solo si hay items escaneados)
+    // 5. revisión de factura (solo si hay items escaneados)
     if (scanReviewState.items.isNotEmpty()) {
         ReviewScanScreen(
             viewModel = scanViewModel,
@@ -326,7 +324,7 @@ fun MyApplicationApp() {
             onDismissRequest = { showPreferencesDialog = false },
             title = { Text("Preferencias") },
             text = {
-                Text("Si seleccionas esta opci?n, el aviso de productos vencidos se mostrar? siempre al entrar al inventario (se desactiva el \"no mostrar hoy\").")
+                Text("Si seleccionas esta opción, el aviso de productos vencidos se mostrará siempre al entrar al inventario (se desactiva el \"no mostrar hoy\").")
             },
             confirmButton = {
                 TextButton(
@@ -349,8 +347,8 @@ fun MyApplicationApp() {
     if (showLogoutDialog) {
         AlertDialog(
             onDismissRequest = { showLogoutDialog = false },
-            title = { Text("Cerrar sesi?n") },
-            text = { Text("?Seguro que quieres cerrar sesi?n?") },
+            title = { Text("Cerrar sesión") },
+            text = { Text("¿Seguro que quieres cerrar sesión?") },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -358,7 +356,7 @@ fun MyApplicationApp() {
                         performLogout()
                     }
                 ) {
-                    Text("Cerrar sesi?n", color = Color(0xFFB71C1C))
+                    Text("Cerrar sesión", color = Color(0xFFB71C1C))
                 }
             },
             dismissButton = {
@@ -367,13 +365,6 @@ fun MyApplicationApp() {
                 }
             }
         )
-    }
-}
-
-@Composable
-private fun PlaceholderScreen(name: String) {
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text(text = name, style = MaterialTheme.typography.headlineMedium, color = Color.Gray)
     }
 }
 
@@ -458,7 +449,7 @@ private fun ProfileScreen(
                 ProfileOptionRow(label = "Ayuda y soporte", greenDark = greenDark)
                 ProfileOptionRow(label = "Acerca de", greenDark = greenDark)
                 ProfileOptionRow(
-                    label = "Cerrar sesi?n",
+                    label = "Cerrar sesión",
                     greenDark = greenDark,
                     isDestructive = true,
                     onClick = onLogout
