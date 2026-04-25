@@ -159,6 +159,52 @@ class InventoryRepository(
     }
 
     /**
+     * Marca un item como consumido (lo aprovechó el usuario).
+     * El backend crea inventory_events type="consumed", que entra al cálculo
+     * de saved_cop. Localmente borramos el item porque ya no está en despensa.
+     */
+    suspend fun consumeInventoryItem(itemId: String): Result<Unit> {
+        return try {
+            val remoteResult = serviceAdapter.consumeInventoryItem(itemId)
+            when (remoteResult) {
+                is Result.Success -> {
+                    dao.deleteItemById(itemId)
+                    savingsCache?.invalidate()
+                    remoteResult
+                }
+                is Result.Error -> remoteResult
+            }
+        } catch (e: Exception) {
+            Result.Error(e)
+        }
+    }
+
+    /**
+     * Marca un item como descartado (se dañó, expiró, etc.).
+     * El backend crea inventory_events type="discarded", entrada de wasted_cop
+     * y de la BQ T3.2 (impacto de recetas en reducción de waste).
+     */
+    suspend fun discardInventoryItem(
+        itemId: String,
+        reason: String,
+        quantity: Int? = null
+    ): Result<Unit> {
+        return try {
+            val remoteResult = serviceAdapter.discardInventoryItem(itemId, reason, quantity)
+            when (remoteResult) {
+                is Result.Success -> {
+                    dao.deleteItemById(itemId)
+                    savingsCache?.invalidate()
+                    remoteResult
+                }
+                is Result.Error -> remoteResult
+            }
+        } catch (e: Exception) {
+            Result.Error(e)
+        }
+    }
+
+    /**
      * Busca items por nombre o código de barras.
      */
     fun searchItems(query: String): Flow<List<FoodItemEntity>> {

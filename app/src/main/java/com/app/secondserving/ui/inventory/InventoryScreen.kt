@@ -31,6 +31,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.app.secondserving.ui.components.OfflineBanner
 
 private val GreenDark = Color(0xFF386641)
 private val UrgencyRed = Color(0xFFE53935)
@@ -45,7 +46,8 @@ private val CATEGORIES = listOf("Todos", "Frutas", "Verduras", "Lácteos", "Carn
 fun InventoryScreen(
     viewModel: InventoryViewModel,
     weatherViewModel: WeatherViewModel = viewModel(),
-    onItemClick: (InventoryItemUi, String) -> Unit = { _, _ -> }
+    onItemClick: (InventoryItemUi, String) -> Unit = { _, _ -> },
+    isOnline: Boolean = true
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
@@ -88,6 +90,11 @@ fun InventoryScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(BackgroundColor)
+    ) {
+        OfflineBanner(isOnline = isOnline)
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
             .padding(horizontal = 16.dp)
     ) {
         Spacer(modifier = Modifier.height(16.dp))
@@ -301,6 +308,7 @@ fun InventoryScreen(
             }
         }
     }
+    } // cierra Column outer (con banner offline)
 
     if (showExpiringSheet) {
         val expiring = (uiState as? InventoryUiState.Success)
