@@ -68,16 +68,12 @@ import com.app.secondserving.ui.segment.UserSegmentViewModelFactory
 import com.app.secondserving.ui.theme.MyApplicationTheme
 import com.app.secondserving.data.AnalyticsRepository
 import com.app.secondserving.data.repository.RecipeRepository
+import com.app.secondserving.notifications.InventorySyncWorker
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        // Si la activity se abrió desde una notificación, registramos
-        // notification_opened en el backend (entrada para la BQ T4.1).
-        // Soporta tanto la notificación local del ExpirationNotifier
-        // (extra "expiring_item_id") como las push de FCM
-        // (extra EXTRA_NAVIGATE_TO de SecondServingMessagingService).
         logNotificationOpenedIfFromIntent()
         setContent {
             MyApplicationTheme {
@@ -143,20 +139,17 @@ fun MyApplicationApp() {
         it as? ComponentActivity
     }?.application as? SecondServingApp
 
-    // Estado de red para mostrar el banner offline en Home e Inventario.
-    // NetworkMonitor (basado en ConnectivityManager.registerNetworkCallback,
-    // curso "Conectivity 2.0.pdf") vive en SecondServingApp como singleton.
     val isOnline by (app?.networkMonitor?.isOnline?.collectAsStateWithLifecycle()
         ?: remember { mutableStateOf(true) })
 
-    // database se usa como fallback del repositorio compartido de inventario.
-    // (RecipeRepository ya no lo necesita: ahora consume /recipes/suggestions del
-    // backend, que hace el matching de ingredientes en el servidor.)
-    val database = com.app.secondserving.data.local.AppDatabase.getDatabase(context.applicationContext)
+    // Sincronizar automáticamente cuando vuelve el internet
+    LaunchedEffect(isOnline) {
+        if (isOnline) {
+            InventorySyncWorker.schedule(context)
+        }
+    }
 
-    // El repositorio compartido garantiza que SavingsCache sea la misma instancia
-    // en InventoryViewModel y HomeViewModel, de modo que la invalidación al
-    // consumir/borrar un item sea visible inmediatamente al volver a Inicio.
+    val database = com.app.secondserving.data.local.AppDatabase.getDatabase(context.applicationContext)
     val sharedRepository = app?.inventoryRepository ?: InventoryRepository(
         database,
         savingsCache = SavingsCache(context.applicationContext)
@@ -171,8 +164,6 @@ fun MyApplicationApp() {
     val recipeViewModel: RecipeViewModel = viewModel(
         factory = RecipeViewModelFactory(RecipeRepository())
     )
-    // Repository singleton para analytics: se reusa en MainActivity (logging)
-    // y en UserSegmentViewModel (consumo de /analytics/segment).
     val analyticsRepository = app?.analyticsRepository ?: AnalyticsRepository()
     val userSegmentViewModel: UserSegmentViewModel = viewModel(
         factory = UserSegmentViewModelFactory(analyticsRepository)
@@ -182,8 +173,9 @@ fun MyApplicationApp() {
     )
     val scanViewModel: ScanViewModel = viewModel(
         factory = ScanViewModelFactory(
-            ReceiptScanner(context.applicationContext),
-            sharedRepository
+            scanner = ReceiptScanner(context.applicationContext),
+            inventoryRepository = sharedRepository,
+            networkMonitor = app?.networkMonitor
         )
     )
     val scanReviewState by scanViewModel.reviewState.collectAsStateWithLifecycle()
@@ -191,13 +183,8 @@ fun MyApplicationApp() {
     val coroutineScope = rememberCoroutineScope()
     val performLogout = {
         coroutineScope.launch {
-            // 1. Borrar datos locales del usuario (Room + SavingsCache)
-            //    antes de limpiar el token, para garantizar que el
-            //    repositorio autenticado aún tiene acceso si lo necesita.
             sharedRepository.clearUserData()
-            // 2. Borrar token y datos de sesión
             SessionManager(context).clearSession()
-            // 3. Navegar al login en el hilo principal
             val intent = Intent(context, LoginActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
             }
@@ -222,16 +209,13 @@ fun MyApplicationApp() {
             selectedRecipe != null -> selectedRecipe = null
             showUserSegment -> showUserSegment = false
             showRecipeImpact -> showRecipeImpact = false
-            // PRIORIDAD 1: cámara ? volvemos a Agregar manual y limpiamos estado
             showScanReceipt -> {
                 scanViewModel.resetReviewState()
                 scanViewModel.resetState()
                 showScanReceipt = false
                 showAddItem = true
             }
-            // PRIORIDAD 2: agregar manual ? simplemente lo cerramos
             showAddItem -> showAddItem = false
-            // PRIORIDAD 3: revisión de factura ? volvemos a la cámara
             scanReviewState.items.isNotEmpty() -> {
                 scanViewModel.resetState()
                 showScanReceipt = true
@@ -242,9 +226,6 @@ fun MyApplicationApp() {
         }
     }
 
-    // ?? JERARQUÍA DE RENDERIZADO (orden de prioridad de overlays) ??????????
-
-    // 1. Detalle de item de inventario
     if (selectedItem != null) {
         val weatherVm: WeatherViewModel = viewModel()
         val actionState by inventoryViewModel.actionState.collectAsStateWithLifecycle()
@@ -261,7 +242,6 @@ fun MyApplicationApp() {
         return
     }
 
-    // 2. Detalle de receta
     if (selectedRecipe != null) {
         RecipeDetailScreen(
             recipe = selectedRecipe!!,
@@ -271,7 +251,6 @@ fun MyApplicationApp() {
         return
     }
 
-    // 2.5. Pantalla de segmento de usuario (BQ T4.1)
     if (showUserSegment) {
         UserSegmentScreen(
             viewModel = userSegmentViewModel,
@@ -280,7 +259,6 @@ fun MyApplicationApp() {
         return
     }
 
-    // 2.6. Pantalla de impacto en waste por categoría (BQ T3.2)
     if (showRecipeImpact) {
         RecipeImpactScreen(
             viewModel = recipeImpactViewModel,
@@ -289,7 +267,6 @@ fun MyApplicationApp() {
         return
     }
 
-    // 3. cámara (escaneo de factura)
     if (showScanReceipt) {
         ScanReceiptScreen(
             viewModel = scanViewModel,
@@ -306,39 +283,47 @@ fun MyApplicationApp() {
         return
     }
 
-    // 4. Agregar item manual
     if (showAddItem) {
-        AddItemScreen(
-            viewModel = inventoryViewModel,
-            onNavigateBack = { showAddItem = false },
-            onOpenScanner = {
-                showAddItem = false
-                showScanReceipt = true
-            }
-        )
-        return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            AddItemScreen(
+                viewModel = inventoryViewModel,
+                onNavigateBack = { showAddItem = false },
+                onOpenScanner = {
+                    showAddItem = false
+                    showScanReceipt = true
+                }
+            )
+            return
+        } else {
+            Toast.makeText(context, "Esta funcionalidad requiere Android 8.0+", Toast.LENGTH_SHORT).show()
+            showAddItem = false
+        }
     }
 
-    // 5. revisión de factura (solo si hay items escaneados)
     if (scanReviewState.items.isNotEmpty()) {
-        ReviewScanScreen(
-            viewModel = scanViewModel,
-            onConfirm = {
-                val requests = scanViewModel.getInventoryRequests()
-                inventoryViewModel.createInventoryItems(requests)
-                Toast.makeText(context, "Agregando ${requests.size} productos...", Toast.LENGTH_SHORT).show()
-                scanViewModel.resetState()
-                scanViewModel.resetReviewState()
-                currentDestination = AppDestinations.DESPENSA
-            },
-            onNavigateBack = {
-                showScanReceipt = true
-            }
-        )
-        return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            ReviewScanScreen(
+                viewModel = scanViewModel,
+                onConfirm = {
+                    val requests = scanViewModel.getInventoryRequests()
+                    inventoryViewModel.createInventoryItems(requests)
+                    Toast.makeText(context, "Agregando ${requests.size} productos...", Toast.LENGTH_SHORT).show()
+                    scanViewModel.resetState()
+                    scanViewModel.resetReviewState()
+                    currentDestination = AppDestinations.DESPENSA
+                },
+                onNavigateBack = {
+                    showScanReceipt = true
+                }
+            )
+            return
+        } else {
+             Toast.makeText(context, "Esta funcionalidad requiere Android 8.0+", Toast.LENGTH_SHORT).show()
+             scanViewModel.resetState()
+             scanViewModel.resetReviewState()
+        }
     }
 
-    // 6. Pantalla principal con BottomBar
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         bottomBar = {
@@ -624,7 +609,7 @@ private fun ProfileOptionRow(
                 modifier = Modifier.weight(1f)
             )
             Text(
-                text = "?",
+                text = "›",
                 fontSize = 20.sp,
                 color = greenDark
             )

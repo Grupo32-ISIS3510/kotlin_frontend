@@ -8,11 +8,13 @@ import com.app.secondserving.data.scan.ReceiptScanner
 import com.app.secondserving.data.ShelfLifePredictor
 import com.app.secondserving.data.InventoryRepository
 import com.app.secondserving.data.ProductRegistryManager
+import com.app.secondserving.data.NetworkMonitor
 import com.app.secondserving.data.network.InventoryItemRequest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
@@ -52,7 +54,8 @@ data class EditableScannedItem(
 
 class ScanViewModel(
     private val scanner: ReceiptScanner,
-    private val inventoryRepository: InventoryRepository? = null
+    private val inventoryRepository: InventoryRepository? = null,
+    private val networkMonitor: NetworkMonitor? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<ScanUiState>(ScanUiState.Idle)
@@ -124,7 +127,6 @@ class ScanViewModel(
     }
 
     fun removeItem(index: Int) {
-        // Se mantiene la función por consistencia, pero se evita su uso en la UI según requerimiento.
         _reviewState.update { state ->
             val newList = state.items.toMutableList()
             if (index in newList.indices) {
@@ -146,6 +148,10 @@ class ScanViewModel(
         }
     }
 
+    /**
+     * Procede con el guardado. Ahora permite soporte OFFLINE al delegar
+     * la lógica de red al ProductRegistryManager y al repositorio.
+     */
     fun saveScannedItems() {
         val currentItems = _reviewState.value.items
         if (currentItems.isEmpty()) return
@@ -153,14 +159,14 @@ class ScanViewModel(
         viewModelScope.launch {
             _reviewState.update { it.copy(isSaving = true, saveError = null) }
             try {
-                // Registrar cada producto por categoría usando el nuevo Manager en Dispatchers.IO
+                // Registrar cada producto por categoría.
+                // ProductRegistryManager maneja internamente si hay red o no para el log.
                 currentItems.forEach { item ->
-                    ProductRegistryManager.registerProduct(item.category)
+                    ProductRegistryManager.registerProduct(item.category, networkMonitor)
                 }
 
-                // Aquí iría la llamada al repositorio si no es nulo
-                // inventoryRepository?.addItems(getInventoryRequests())
-
+                // El éxito aquí dispara el callback en la UI que llama al
+                // inventoryRepository.createInventoryItems, el cual ya tiene soporte offline.
                 _reviewState.update { it.copy(isSaving = false, saveSuccess = true) }
             } catch (e: Exception) {
                 _reviewState.update { it.copy(isSaving = false, saveError = e.message ?: "Error al guardar") }
@@ -173,7 +179,7 @@ class ScanViewModel(
     }
     
     fun resetReviewState() {
-        _reviewState.value = ScanReviewState()
+        _reviewState.update { it.copy(saveSuccess = false, saveError = null) }
     }
 
     override fun onCleared() {
@@ -184,12 +190,13 @@ class ScanViewModel(
 
 class ScanViewModelFactory(
     private val scanner: ReceiptScanner,
-    private val inventoryRepository: InventoryRepository? = null
+    private val inventoryRepository: InventoryRepository? = null,
+    private val networkMonitor: NetworkMonitor? = null
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(ScanViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return ScanViewModel(scanner, inventoryRepository) as T
+            return ScanViewModel(scanner, inventoryRepository, networkMonitor) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

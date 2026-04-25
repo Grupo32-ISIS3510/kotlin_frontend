@@ -35,6 +35,9 @@ object BackNavigationVerifier {
         registerFirstBack("ReviewScanScreen")
     }
 
+    /**
+     * Registra que el usuario volvió desde la pantalla de agregar ítem.
+     */
     suspend fun trackBackFromAddItem() = withContext(Dispatchers.IO) {
         _isAddItemScreen.value = true
         registerFirstBack("AddItemScreen")

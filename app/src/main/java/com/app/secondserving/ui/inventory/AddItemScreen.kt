@@ -272,6 +272,7 @@ fun AddItemScreen(
                         }
                     },
                     confirmButton = {
+                        @Suppress("DefaultLocale")
                         TextButton(
                             onClick = {
                                 val date = String.format("%04d-%02d-%02d", selectedYear, selectedMonth + 1, selectedDay)
@@ -377,6 +378,7 @@ fun AddItemScreen(
                         }
                     },
                     confirmButton = {
+                        @Suppress("DefaultLocale")
                         TextButton(
                             onClick = {
                                 val date = String.format("%04d-%02d-%02d", expYear, expMonth + 1, expDay)

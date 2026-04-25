@@ -10,13 +10,14 @@ import androidx.room.RoomDatabase
  * Patrón DAO: Centraliza el acceso a todas las tablas locales.
  */
 @Database(
-    entities = [FoodItemEntity::class],
-    version = 1,
+    entities = [FoodItemEntity::class, PendingOperationEntity::class],
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun foodItemDao(): FoodItemDao
+    abstract fun pendingOperationDao(): PendingOperationDao
 
     companion object {
         @Volatile
