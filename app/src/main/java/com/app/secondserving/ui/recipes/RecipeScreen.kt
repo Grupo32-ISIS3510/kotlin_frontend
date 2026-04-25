@@ -213,13 +213,14 @@ fun EmptyRecipesState() {
         )
         Spacer(modifier = Modifier.height(16.dp))
         Text(
-            "No hay recomendaciones",
+            "Sin recetas por ahora",
             fontSize = 20.sp,
             fontWeight = FontWeight.Bold,
             color = Color.Gray
         )
+        Spacer(modifier = Modifier.height(6.dp))
         Text(
-            "Agrega más productos a tu inventario para recibir sugerencias inteligentes basadas en lo que tienes.",
+            "Oops, no tenemos recetas disponibles que combinen con tu despensa. ¡Vuelve más tarde! :(",
             textAlign = TextAlign.Center,
             color = Color.Gray
         )

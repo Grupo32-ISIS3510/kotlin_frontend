@@ -47,14 +47,20 @@ class RecipeViewModel(private val repository: RecipeRepository) : ViewModel() {
     fun fetchRecipes() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null, isEmpty = false) }
-            
+
             when (val result = repository.getRecommendedRecipes()) {
                 is Result.Success -> {
-                    if (result.data.isEmpty()) {
+                    // Filtramos recetas sin título o sin id porque el backend a veces
+                    // devuelve recetas con metadata incompleta y mostrar tarjetas
+                    // genéricas "Sin título" no aporta nada al usuario.
+                    val validRecipes = result.data.filter {
+                        !it.title.isNullOrBlank() && !it.id.isNullOrBlank()
+                    }
+                    if (validRecipes.isEmpty()) {
                         _uiState.update { it.copy(isLoading = false, isEmpty = true, recipes = emptyList()) }
                     } else {
                         // T2.3: Ranked list - Sort by score (descending) and then by expiry days (ascending)
-                        val rankedRecipes = result.data.sortedWith(
+                        val rankedRecipes = validRecipes.sortedWith(
                             compareByDescending<Recipe> { it.score ?: 0.0 }
                                 .thenBy { it.soonest_expiry_days ?: Int.MAX_VALUE }
                         )
@@ -62,8 +68,8 @@ class RecipeViewModel(private val repository: RecipeRepository) : ViewModel() {
                     }
                 }
                 is Result.Error -> {
-                    _uiState.update { 
-                        it.copy(isLoading = false, error = result.exception.message ?: "Error desconocido") 
+                    _uiState.update {
+                        it.copy(isLoading = false, error = result.exception.message ?: "Error desconocido")
                     }
                 }
             }
