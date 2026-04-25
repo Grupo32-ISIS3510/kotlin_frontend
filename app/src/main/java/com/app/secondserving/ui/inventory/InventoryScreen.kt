@@ -258,7 +258,26 @@ fun InventoryScreen(
                 is InventoryUiState.Success -> {
                     if (state.items.isEmpty()) {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text("Tu despensa está vacía", color = Color.Gray, fontSize = 16.sp)
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(12.dp),
+                                modifier = Modifier.padding(32.dp)
+                            ) {
+                                Text("🛒", fontSize = 48.sp)
+                                Text(
+                                    text = "Tu despensa está vacía",
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF1A1A1A)
+                                )
+                                Text(
+                                    text = "Agrega tu primer producto con el botón + para empezar a gestionar tu inventario",
+                                    fontSize = 14.sp,
+                                    color = Color.Gray,
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                    lineHeight = 20.sp
+                                )
+                            }
                         }
                     } else {
                         LazyVerticalGrid(

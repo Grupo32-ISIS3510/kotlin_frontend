@@ -180,6 +180,18 @@ class InventoryRepository(
         return getInventory(forceRefresh = true)
     }
 
+    // ── Gestión de sesión ────────────────────────────────────────────────────
+
+    /**
+     * Elimina todos los datos locales del usuario actual.
+     * Debe llamarse justo antes de navegar al login para que el siguiente
+     * usuario no vea inventario ni analíticas del anterior.
+     */
+    suspend fun clearUserData() {
+        dao.deleteAllItems()
+        savingsCache?.clear()
+    }
+
     // ── Analytics de ahorro ──────────────────────────────────────────────────
 
     /**

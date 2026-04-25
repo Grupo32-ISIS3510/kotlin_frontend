@@ -17,7 +17,7 @@ interface ApiService {
     suspend fun register(@Body request: RegisterRequest): Response<TokenResponse>
 
     @GET("inventory")
-    suspend fun getInventory(): Response<List<InventoryItem>>
+    suspend fun getInventory(): Response<InventoryResponse>
 
     @POST("inventory")
     suspend fun createInventoryItem(@Body request: InventoryItemRequest): Response<InventoryItem>
