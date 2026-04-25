@@ -121,7 +121,7 @@ fun RecipeCard(recipe: Recipe, onClick: () -> Unit) {
                 verticalAlignment = Alignment.Top
             ) {
                 Text(
-                    text = recipe.title,
+                    text = recipe.title ?: "Sin título",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     color = GreenDark,
@@ -158,7 +158,9 @@ fun RecipeCard(recipe: Recipe, onClick: () -> Unit) {
             
             Spacer(modifier = Modifier.height(8.dp))
             
-            if (recipe.matched_ingredients.isNotEmpty()) {
+            // El backend a veces devuelve matched_ingredients como null,
+            // por eso usamos isNullOrEmpty/joinToString con ?:.
+            if (!recipe.matched_ingredients.isNullOrEmpty()) {
                 Text(
                     text = "Aprovecha: ${recipe.matched_ingredients.joinToString(", ")}",
                     fontSize = 14.sp,

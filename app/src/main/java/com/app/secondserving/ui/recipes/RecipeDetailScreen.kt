@@ -35,8 +35,9 @@ fun RecipeDetailScreen(
     // Registra la visualización de la receta en el backend (recipe_interactions).
     // Necesario para la BQ T4.1: el segmento del usuario depende del open_rate,
     // y para distinguir Proactive vs Passive el backend cuenta tanto views como cooks.
+    // Solo logueamos si el id no viene null (recetas sin id no se pueden referenciar).
     LaunchedEffect(recipe.id) {
-        viewModel.viewRecipe(recipe.id)
+        recipe.id?.let { viewModel.viewRecipe(it) }
     }
 
     var showDialog by remember { mutableStateOf(false) }
@@ -93,7 +94,7 @@ fun RecipeDetailScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(recipe.title, fontWeight = FontWeight.Bold, color = GreenDark) },
+                title = { Text(recipe.title ?: "Sin título", fontWeight = FontWeight.Bold, color = GreenDark) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         // Corregido: Usar versión AutoMirrored
@@ -135,28 +136,39 @@ fun RecipeDetailScreen(
                 colors = CardDefaults.cardColors(containerColor = Color.White)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    recipe.ingredients.forEach { ingredient ->
-                        Row(
-                            modifier = Modifier.padding(vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            val isMatched = recipe.matched_ingredients.any { 
-                                it.equals(ingredient.name, ignoreCase = true) 
+                    val ingredients = recipe.ingredients.orEmpty()
+                    val matched = recipe.matched_ingredients.orEmpty()
+                    if (ingredients.isEmpty()) {
+                        Text(
+                            text = "Esta receta no trae ingredientes detallados.",
+                            fontSize = 13.sp,
+                            color = Color.Gray
+                        )
+                    } else {
+                        ingredients.forEach { ingredient ->
+                            val name = ingredient.name.orEmpty()
+                            Row(
+                                modifier = Modifier.padding(vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                val isMatched = matched.any {
+                                    it.equals(name, ignoreCase = true)
+                                }
+
+                                Icon(
+                                    imageVector = if (isMatched) Icons.Default.Done else Icons.Default.Kitchen,
+                                    contentDescription = null,
+                                    tint = if (isMatched) GreenDark else Color.Gray,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "${ingredient.quantity.orEmpty()} ${ingredient.unit ?: ""} $name".trim(),
+                                    fontSize = 14.sp,
+                                    color = if (isMatched) GreenDark else Color.Black,
+                                    fontWeight = if (isMatched) FontWeight.Bold else FontWeight.Normal
+                                )
                             }
-                            
-                            Icon(
-                                imageVector = if (isMatched) Icons.Default.Done else Icons.Default.Kitchen,
-                                contentDescription = null,
-                                tint = if (isMatched) GreenDark else Color.Gray,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "${ingredient.quantity} ${ingredient.unit ?: ""} ${ingredient.name}",
-                                fontSize = 14.sp,
-                                color = if (isMatched) GreenDark else Color.Black,
-                                fontWeight = if (isMatched) FontWeight.Bold else FontWeight.Normal
-                            )
                         }
                     }
                 }
@@ -188,11 +200,11 @@ fun RecipeDetailScreen(
             Spacer(modifier = Modifier.height(32.dp))
 
             Button(
-                onClick = { viewModel.cookRecipe(recipe.id) },
+                onClick = { recipe.id?.let { viewModel.cookRecipe(it) } },
                 modifier = Modifier.fillMaxWidth().height(56.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = GreenDark),
                 shape = RoundedCornerShape(12.dp),
-                enabled = cookState !is CookUiState.Loading
+                enabled = cookState !is CookUiState.Loading && recipe.id != null
             ) {
                 if (cookState is CookUiState.Loading) {
                     CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
