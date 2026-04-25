@@ -215,7 +215,10 @@ fun MyApplicationApp() {
                 showScanReceipt = false
                 showAddItem = true
             }
-            showAddItem -> showAddItem = false
+            showAddItem -> {
+                scanViewModel.resetReviewState() // Limpiar scans si cancelamos agregar
+                showAddItem = false
+            }
             scanReviewState.items.isNotEmpty() -> {
                 scanViewModel.resetState()
                 showScanReceipt = true
@@ -287,7 +290,10 @@ fun MyApplicationApp() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             AddItemScreen(
                 viewModel = inventoryViewModel,
-                onNavigateBack = { showAddItem = false },
+                onNavigateBack = { 
+                    scanViewModel.resetReviewState() // Limpiar posible scan previo al volver
+                    showAddItem = false 
+                },
                 onOpenScanner = {
                     showAddItem = false
                     showScanReceipt = true

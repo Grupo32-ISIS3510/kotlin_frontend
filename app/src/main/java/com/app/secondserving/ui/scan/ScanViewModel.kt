@@ -178,8 +178,12 @@ class ScanViewModel(
         _uiState.value = ScanUiState.Idle
     }
     
+    /**
+     * Limpia completamente el estado de revisión, incluyendo la lista de items.
+     * Esto es crucial para evitar bucles de navegación en la MainActivity.
+     */
     fun resetReviewState() {
-        _reviewState.update { it.copy(saveSuccess = false, saveError = null) }
+        _reviewState.value = ScanReviewState()
     }
 
     override fun onCleared() {
