@@ -4,6 +4,7 @@ import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.PUT
 import retrofit2.http.Path
@@ -27,6 +28,21 @@ interface ApiService {
 
     @PUT("inventory/{id}")
     suspend fun updateInventoryItem(@Path("id") itemId: String, @Body request: InventoryItemRequest): Response<InventoryItem>
+
+    // PATCH /inventory/{id}/consume — el backend marca el item como consumido
+    // y crea una entrada en inventory_events con type="consumed". Esto pobla
+    // las analíticas de saved_cop (lo que el usuario aprovechó antes de vencer).
+    @PATCH("inventory/{id}/consume")
+    suspend fun consumeInventoryItem(@Path("id") itemId: String): Response<Unit>
+
+    // PATCH /inventory/{id}/discard — marca el item como descartado y crea
+    // inventory_events con type="discarded". Pobla wasted_cop y es la entrada
+    // de la BQ T3.2 (impacto de recetas en reducción de waste).
+    @PATCH("inventory/{id}/discard")
+    suspend fun discardInventoryItem(
+        @Path("id") itemId: String,
+        @Body request: DiscardRequest
+    ): Response<Unit>
 
     @POST("notifications/token")
     suspend fun registerFcmToken(@Body body: Map<String, String>): Response<Unit>

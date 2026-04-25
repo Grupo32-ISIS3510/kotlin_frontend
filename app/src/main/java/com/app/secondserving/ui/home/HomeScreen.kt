@@ -53,6 +53,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.app.secondserving.ui.components.OfflineBanner
 import com.app.secondserving.ui.inventory.InventoryItemUi
 import com.app.secondserving.ui.inventory.InventoryUiState
 import com.app.secondserving.ui.inventory.InventoryViewModel
@@ -86,7 +87,8 @@ fun HomeScreen(
     inventoryViewModel: InventoryViewModel,
     userName: String,
     onNavigateToProfile: () -> Unit = {},
-    onNavigateToSegment: () -> Unit = {}
+    onNavigateToSegment: () -> Unit = {},
+    isOnline: Boolean = true
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val inventoryState by inventoryViewModel.uiState.collectAsState()
@@ -100,23 +102,29 @@ fun HomeScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(BackgroundColor)
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp)
-            .padding(top = 24.dp, bottom = 32.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        GreetingHeader(userName = userName, onNavigateToProfile = onNavigateToProfile)
+        OfflineBanner(isOnline = isOnline)
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp)
+                .padding(top = 24.dp, bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
+            GreetingHeader(userName = userName, onNavigateToProfile = onNavigateToProfile)
 
         SavingsCard(state = uiState, onRetry = { viewModel.loadSavings() })
 
         UserSegmentTeaserCard(onClick = onNavigateToSegment)
 
-        ComerPrimeroSection(
-            state = inventoryState,
-            onRetry = { inventoryViewModel.loadInventory() }
-        )
+            ComerPrimeroSection(
+                state = inventoryState,
+                onRetry = { inventoryViewModel.loadInventory() }
+            )
 
-        PlanDeHoySection()
+            PlanDeHoySection()
+        }
     }
 }
 

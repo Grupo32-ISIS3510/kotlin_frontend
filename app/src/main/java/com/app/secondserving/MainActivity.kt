@@ -139,6 +139,12 @@ fun MyApplicationApp() {
         it as? ComponentActivity
     }?.application as? SecondServingApp
 
+    // Estado de red para mostrar el banner offline en Home e Inventario.
+    // NetworkMonitor (basado en ConnectivityManager.registerNetworkCallback,
+    // curso "Conectivity 2.0.pdf") vive en SecondServingApp como singleton.
+    val isOnline by (app?.networkMonitor?.isOnline?.collectAsStateWithLifecycle()
+        ?: remember { mutableStateOf(true) })
+
     // database se usa como fallback del repositorio compartido de inventario.
     // (RecipeRepository ya no lo necesita: ahora consume /recipes/suggestions del
     // backend, que hace el matching de ingredientes en el servidor.)
@@ -232,10 +238,15 @@ fun MyApplicationApp() {
     // 1. Detalle de item de inventario
     if (selectedItem != null) {
         val weatherVm: WeatherViewModel = viewModel()
+        val actionState by inventoryViewModel.actionState.collectAsStateWithLifecycle()
         ItemDetailScreen(
             item = selectedItem!!,
             storageTip = selectedItemTip,
             weatherState = weatherVm.weatherState.collectAsState().value,
+            actionState = actionState,
+            onConsume = { itemId -> inventoryViewModel.consumeItem(itemId) },
+            onDiscard = { itemId, reason -> inventoryViewModel.discardItem(itemId, reason) },
+            onActionConsumed = { inventoryViewModel.resetActionState() },
             onNavigateBack = { selectedItem = null }
         )
         return
@@ -359,14 +370,16 @@ fun MyApplicationApp() {
                     inventoryViewModel = inventoryViewModel,
                     userName = SessionManager(context).getFullName().orEmpty(),
                     onNavigateToProfile = { currentDestination = AppDestinations.PERFIL },
-                    onNavigateToSegment = { showUserSegment = true }
+                    onNavigateToSegment = { showUserSegment = true },
+                    isOnline = isOnline
                 )
                 AppDestinations.DESPENSA -> InventoryScreen(
                     viewModel = inventoryViewModel,
                     onItemClick = { item, tip ->
                         selectedItem = item
                         selectedItemTip = tip
-                    }
+                    },
+                    isOnline = isOnline
                 )
                 AppDestinations.RECETAS -> {
                     RecipeScreen(

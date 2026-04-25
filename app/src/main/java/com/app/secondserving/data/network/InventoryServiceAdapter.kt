@@ -79,6 +79,44 @@ class InventoryServiceAdapter(
         }
     }
 
+    /** Marca el item como consumido. El backend crea inventory_events type="consumed". */
+    suspend fun consumeInventoryItem(itemId: String): Result<Unit> {
+        return try {
+            val response = apiService.consumeInventoryItem(itemId)
+            if (response.isSuccessful) {
+                Result.Success(Unit)
+            } else {
+                Result.Error(
+                    IOException("Error consuming item: ${response.code()} ${response.message()}")
+                )
+            }
+        } catch (e: Exception) {
+            Result.Error(IOException("Error consuming item", e))
+        }
+    }
+
+    /**
+     * Marca el item como descartado con una razón. Si quantity es null, el
+     * backend descarta toda la cantidad. Crea inventory_events type="discarded".
+     */
+    suspend fun discardInventoryItem(itemId: String, reason: String, quantity: Int? = null): Result<Unit> {
+        return try {
+            val response = apiService.discardInventoryItem(
+                itemId,
+                DiscardRequest(reason = reason, quantity = quantity)
+            )
+            if (response.isSuccessful) {
+                Result.Success(Unit)
+            } else {
+                Result.Error(
+                    IOException("Error discarding item: ${response.code()} ${response.message()}")
+                )
+            }
+        } catch (e: Exception) {
+            Result.Error(IOException("Error discarding item", e))
+        }
+    }
+
     /**
      * Actualiza un item en el backend.
      */
