@@ -75,6 +75,31 @@ class AnalyticsRepository(
         }
     }
 
+    /**
+     * Devuelve el waste agrupado por categoría: por cada categoría, una lista
+     * con las observaciones mensuales (value_lost_cop). Sirve directo a la
+     * BQ T3.2: las observaciones alimentan el box plot.
+     *
+     * Si una categoría tiene una sola observación se grafica como punto;
+     * con dos o más se calculan min/q1/mediana/q3/max (la pantalla decide
+     * la representación visual).
+     */
+    suspend fun getWasteByCategory(months: Int = 3): Result<Map<String, List<Double>>> {
+        return try {
+            val response = apiService.getWasteAnalytics(months)
+            if (response.isSuccessful) {
+                val items = response.body() ?: emptyList()
+                val grouped = items.groupBy { it.category.ifBlank { "Sin categoría" } }
+                    .mapValues { (_, list) -> list.map { it.value_lost_cop } }
+                Result.Success(grouped)
+            } else {
+                Result.Error(IOException("Error ${response.code()}: ${response.message()}"))
+            }
+        } catch (e: Exception) {
+            Result.Error(e)
+        }
+    }
+
     private fun nowIso(): String =
         DateTimeFormatter.ISO_INSTANT.format(Instant.now())
 
