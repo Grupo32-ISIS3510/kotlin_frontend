@@ -59,16 +59,47 @@ import com.app.secondserving.ui.scan.ReviewScanScreen
 import com.app.secondserving.ui.scan.ScanReceiptScreen
 import com.app.secondserving.ui.scan.ScanViewModel
 import com.app.secondserving.ui.scan.ScanViewModelFactory
+import com.app.secondserving.ui.segment.UserSegmentScreen
+import com.app.secondserving.ui.segment.UserSegmentViewModel
+import com.app.secondserving.ui.segment.UserSegmentViewModelFactory
 import com.app.secondserving.ui.theme.MyApplicationTheme
+import com.app.secondserving.data.AnalyticsRepository
 import com.app.secondserving.data.repository.RecipeRepository
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // Si la activity se abrió desde una notificación, registramos
+        // notification_opened en el backend (entrada para la BQ T4.1).
+        // Soporta tanto la notificación local del ExpirationNotifier
+        // (extra "expiring_item_id") como las push de FCM
+        // (extra EXTRA_NAVIGATE_TO de SecondServingMessagingService).
+        logNotificationOpenedIfFromIntent()
         setContent {
             MyApplicationTheme {
                 MyApplicationApp()
+            }
+        }
+    }
+
+    private fun logNotificationOpenedIfFromIntent() {
+        val app = application as? SecondServingApp ?: return
+        val analytics: AnalyticsRepository = app.analyticsRepository
+        intent?.let { i ->
+            when {
+                i.hasExtra("expiring_item_id") -> analytics.logNotificationOpened(
+                    mapOf(
+                        "source" to "expiration_notifier",
+                        "item_id" to (i.getStringExtra("expiring_item_id") ?: "")
+                    )
+                )
+                i.hasExtra(SecondServingMessagingService.EXTRA_NAVIGATE_TO) -> analytics.logNotificationOpened(
+                    mapOf(
+                        "source" to "fcm",
+                        "navigate_to" to (i.getStringExtra(SecondServingMessagingService.EXTRA_NAVIGATE_TO) ?: "")
+                    )
+                )
             }
         }
     }
@@ -92,6 +123,7 @@ fun MyApplicationApp() {
     var selectedItem by remember { mutableStateOf<InventoryItemUi?>(null) }
     var selectedItemTip by remember { mutableStateOf("") }
     var selectedRecipe by remember { mutableStateOf<com.app.secondserving.data.network.Recipe?>(null) }
+    var showUserSegment by remember { mutableStateOf(false) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -129,6 +161,12 @@ fun MyApplicationApp() {
     val recipeViewModel: RecipeViewModel = viewModel(
         factory = RecipeViewModelFactory(RecipeRepository())
     )
+    // Repository singleton para analytics: se reusa en MainActivity (logging)
+    // y en UserSegmentViewModel (consumo de /analytics/segment).
+    val analyticsRepository = app?.analyticsRepository ?: AnalyticsRepository()
+    val userSegmentViewModel: UserSegmentViewModel = viewModel(
+        factory = UserSegmentViewModelFactory(analyticsRepository)
+    )
     val scanViewModel: ScanViewModel = viewModel(
         factory = ScanViewModelFactory(
             ReceiptScanner(context.applicationContext),
@@ -159,6 +197,7 @@ fun MyApplicationApp() {
     BackHandler(
         enabled = selectedItem != null ||
             selectedRecipe != null ||
+            showUserSegment ||
             showScanReceipt ||
             showAddItem ||
             scanReviewState.items.isNotEmpty() ||
@@ -167,6 +206,7 @@ fun MyApplicationApp() {
         when {
             selectedItem != null -> selectedItem = null
             selectedRecipe != null -> selectedRecipe = null
+            showUserSegment -> showUserSegment = false
             // PRIORIDAD 1: cámara ? volvemos a Agregar manual y limpiamos estado
             showScanReceipt -> {
                 scanViewModel.resetReviewState()
@@ -207,6 +247,15 @@ fun MyApplicationApp() {
             recipe = selectedRecipe!!,
             viewModel = recipeViewModel,
             onNavigateBack = { selectedRecipe = null }
+        )
+        return
+    }
+
+    // 2.5. Pantalla de segmento de usuario (BQ T4.1)
+    if (showUserSegment) {
+        UserSegmentScreen(
+            viewModel = userSegmentViewModel,
+            onNavigateBack = { showUserSegment = false }
         )
         return
     }
@@ -309,7 +358,8 @@ fun MyApplicationApp() {
                     viewModel = homeViewModel,
                     inventoryViewModel = inventoryViewModel,
                     userName = SessionManager(context).getFullName().orEmpty(),
-                    onNavigateToProfile = { currentDestination = AppDestinations.PERFIL }
+                    onNavigateToProfile = { currentDestination = AppDestinations.PERFIL },
+                    onNavigateToSegment = { showUserSegment = true }
                 )
                 AppDestinations.DESPENSA -> InventoryScreen(
                     viewModel = inventoryViewModel,
