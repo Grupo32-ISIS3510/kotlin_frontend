@@ -143,7 +143,8 @@ class ScanViewModel(
                 category = item.category,
                 quantity = item.quantity.toDouble(),
                 purchase_date = item.purchaseDate,
-                expiry_date = item.expiryDate
+                expiry_date = item.expiryDate,
+                unit_price = item.price
             )
         }
     }

@@ -3,6 +3,7 @@ package com.app.secondserving
 import android.app.Application
 import android.util.Log
 import com.app.secondserving.data.AnalyticsRepository
+import com.app.secondserving.data.ConsumptionCache
 import com.app.secondserving.data.ExpirationNotifier
 import com.app.secondserving.data.InventoryRepository
 import com.app.secondserving.data.NetworkMonitor
@@ -10,12 +11,14 @@ import com.app.secondserving.data.SavingsCache
 import com.app.secondserving.data.SessionManager
 import com.app.secondserving.data.local.AppDatabase
 import com.app.secondserving.data.network.RetrofitClient
+import com.app.secondserving.data.network.WeatherService
 import com.app.secondserving.notifications.ExpirationCheckWorker
 import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 
 class SecondServingApp : Application() {
@@ -37,6 +40,16 @@ class SecondServingApp : Application() {
     lateinit var analyticsRepository: AnalyticsRepository
         private set
 
+    lateinit var consumptionCache: ConsumptionCache
+        private set
+
+    lateinit var weatherService: WeatherService
+        private set
+
+    // Señal que los interceptores de red emiten cuando el backend devuelve 401.
+    // La UI (MainActivity) colecta este flow y ejecuta el logout completo.
+    val sessionExpiredFlow = MutableStateFlow(false)
+
     // NetworkMonitor singleton: la UI lo observa (banner offline) y se
     // expone para que más adelante AnalyticsSyncWorker reaccione cuando
     // vuelva la red. Vive durante toda la vida del proceso.
@@ -47,7 +60,10 @@ class SecondServingApp : Application() {
         super.onCreate()
         sessionManager = SessionManager(this)
         database = AppDatabase.getDatabase(this)
-        RetrofitClient.init(sessionManager)
+        RetrofitClient.init(sessionManager) {
+            // Hilo de red: solo actualizamos el flow; la UI recoge el cambio.
+            sessionExpiredFlow.value = true
+        }
         inventoryRepository = InventoryRepository(database, savingsCache = SavingsCache(this))
         expirationNotifier = ExpirationNotifier(this)
         expirationNotifier.createNotificationChannel()
@@ -56,6 +72,8 @@ class SecondServingApp : Application() {
         // los ViewModels que necesitan llamar al backend (UserSegmentViewModel).
         analyticsRepository = AnalyticsRepository()
         expirationNotifier.setAnalyticsRepository(analyticsRepository)
+        consumptionCache = ConsumptionCache(applicationContext)
+        weatherService = WeatherService(applicationContext)
         networkMonitor = NetworkMonitor(this)
         ExpirationCheckWorker.enqueueDaily(this)
         registerFcmTokenIfLoggedIn()

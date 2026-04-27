@@ -19,6 +19,7 @@ data class FoodItemEntity(
     val barcode: String? = null,
     val storageRecommendation: String? = null,
     val originalShelfLifeDays: Int? = null, // Vida útil original en días
+    val unitPrice: Double? = null,          // Necesario para saved_cop / wasted_cop
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
 )

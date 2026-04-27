@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.app.secondserving.data.ConsumptionCache
 import com.app.secondserving.data.InventoryRepository
 import com.app.secondserving.data.SavingsCache
 import com.app.secondserving.data.SessionManager
@@ -48,6 +49,7 @@ import com.app.secondserving.ui.inventory.InventoryItemUi
 import com.app.secondserving.ui.inventory.InventoryScreen
 import com.app.secondserving.ui.inventory.InventoryViewModel
 import com.app.secondserving.ui.inventory.InventoryViewModelFactory
+import com.app.secondserving.ui.inventory.ItemActionState
 import com.app.secondserving.ui.inventory.ItemDetailScreen
 import com.app.secondserving.ui.inventory.WeatherViewModel
 import com.app.secondserving.ui.login.LoginActivity
@@ -59,6 +61,9 @@ import com.app.secondserving.ui.scan.ReviewScanScreen
 import com.app.secondserving.ui.scan.ScanReceiptScreen
 import com.app.secondserving.ui.scan.ScanViewModel
 import com.app.secondserving.ui.scan.ScanViewModelFactory
+import com.app.secondserving.ui.analytics.ConsumptionAnalyticsScreen
+import com.app.secondserving.ui.analytics.ConsumptionAnalyticsViewModel
+import com.app.secondserving.ui.analytics.ConsumptionAnalyticsViewModelFactory
 import com.app.secondserving.ui.analytics.RecipeImpactScreen
 import com.app.secondserving.ui.analytics.RecipeImpactViewModel
 import com.app.secondserving.ui.analytics.RecipeImpactViewModelFactory
@@ -124,6 +129,7 @@ fun MyApplicationApp() {
     var selectedRecipe by remember { mutableStateOf<com.app.secondserving.data.network.Recipe?>(null) }
     var showUserSegment by remember { mutableStateOf(false) }
     var showRecipeImpact by remember { mutableStateOf(false) }
+    var showConsumptionAnalytics by remember { mutableStateOf(false) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -155,8 +161,15 @@ fun MyApplicationApp() {
         savingsCache = SavingsCache(context.applicationContext)
     )
 
+    val analyticsRepository = app?.analyticsRepository ?: AnalyticsRepository()
+    val consumptionCache = app?.consumptionCache ?: ConsumptionCache(context.applicationContext)
     val inventoryViewModel: InventoryViewModel = viewModel(
-        factory = InventoryViewModelFactory(sharedRepository, app?.expirationNotifier)
+        factory = InventoryViewModelFactory(
+            repository          = sharedRepository,
+            expirationNotifier  = app?.expirationNotifier,
+            analyticsRepository = analyticsRepository,
+            consumptionCache    = consumptionCache
+        )
     )
     val homeViewModel: HomeViewModel = viewModel(
         factory = HomeViewModelFactory(sharedRepository)
@@ -164,12 +177,14 @@ fun MyApplicationApp() {
     val recipeViewModel: RecipeViewModel = viewModel(
         factory = RecipeViewModelFactory(RecipeRepository())
     )
-    val analyticsRepository = app?.analyticsRepository ?: AnalyticsRepository()
     val userSegmentViewModel: UserSegmentViewModel = viewModel(
         factory = UserSegmentViewModelFactory(analyticsRepository)
     )
     val recipeImpactViewModel: RecipeImpactViewModel = viewModel(
         factory = RecipeImpactViewModelFactory(analyticsRepository)
+    )
+    val consumptionAnalyticsViewModel: ConsumptionAnalyticsViewModel = viewModel(
+        factory = ConsumptionAnalyticsViewModelFactory(consumptionCache)
     )
     val scanViewModel: ScanViewModel = viewModel(
         factory = ScanViewModelFactory(
@@ -180,11 +195,42 @@ fun MyApplicationApp() {
     )
     val scanReviewState by scanViewModel.reviewState.collectAsStateWithLifecycle()
 
+    // Colectamos la señal de sesión expirada. Cuando el interceptor detecta
+    // 401, limpiamos TODAS las cachés y enviamos al usuario al login.
+    LaunchedEffect(Unit) {
+        app?.sessionExpiredFlow?.collect { expired ->
+            if (!expired) return@collect
+            app.sessionExpiredFlow.value = false
+            sharedRepository.clearUserData()
+            consumptionCache.clear()
+            app.weatherService.clearCache()
+            SessionManager(context).clearSession()
+            val intent = Intent(context, LoginActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            }
+            context.startActivity(intent)
+            (context as? ComponentActivity)?.finish()
+        }
+    }
+
+    // Cuando el usuario consume o descarta un item desde ItemDetailScreen,
+    // el ahorro acumulado del backend cambia, así que recargamos savings
+    // para que el card del Home no quede desactualizado al regresar.
+    val itemActionState by inventoryViewModel.actionState.collectAsStateWithLifecycle()
+    LaunchedEffect(itemActionState) {
+        if (itemActionState is ItemActionState.Success) {
+            homeViewModel.loadSavings()
+        }
+    }
+
     val coroutineScope = rememberCoroutineScope()
     val performLogout = {
         coroutineScope.launch {
-            sharedRepository.clearUserData()
-            SessionManager(context).clearSession()
+            // Limpiar datos del usuario actual antes de ir al login
+            sharedRepository.clearUserData()          // Room + SavingsCache + PendingOps
+            consumptionCache.clear()                   // T4.2 — categorías de consumo
+            app?.weatherService?.clearCache()          // clima cacheado
+            SessionManager(context).clearSession()     // token + datos de perfil
             val intent = Intent(context, LoginActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
             }
@@ -199,6 +245,7 @@ fun MyApplicationApp() {
             selectedRecipe != null ||
             showUserSegment ||
             showRecipeImpact ||
+            showConsumptionAnalytics ||
             showScanReceipt ||
             showAddItem ||
             scanReviewState.items.isNotEmpty() ||
@@ -209,6 +256,7 @@ fun MyApplicationApp() {
             selectedRecipe != null -> selectedRecipe = null
             showUserSegment -> showUserSegment = false
             showRecipeImpact -> showRecipeImpact = false
+            showConsumptionAnalytics -> showConsumptionAnalytics = false
             showScanReceipt -> {
                 scanViewModel.resetReviewState()
                 scanViewModel.resetState()
@@ -249,7 +297,13 @@ fun MyApplicationApp() {
         RecipeDetailScreen(
             recipe = selectedRecipe!!,
             viewModel = recipeViewModel,
-            onNavigateBack = { selectedRecipe = null }
+            onNavigateBack = { selectedRecipe = null },
+            onCookSuccess = {
+                // El backend marcó los ingredientes como consumidos — refrescamos
+                // inventario y savings en background sin bloquear la pantalla de detalle.
+                inventoryViewModel.loadInventory(showLoading = false)
+                homeViewModel.loadSavings()
+            }
         )
         return
     }
@@ -266,6 +320,15 @@ fun MyApplicationApp() {
         RecipeImpactScreen(
             viewModel = recipeImpactViewModel,
             onNavigateBack = { showRecipeImpact = false }
+        )
+        return
+    }
+
+    if (showConsumptionAnalytics) {
+        consumptionAnalyticsViewModel.load()
+        ConsumptionAnalyticsScreen(
+            viewModel = consumptionAnalyticsViewModel,
+            onNavigateBack = { showConsumptionAnalytics = false }
         )
         return
     }
@@ -381,6 +444,11 @@ fun MyApplicationApp() {
                     onNavigateToProfile = { currentDestination = AppDestinations.PERFIL },
                     onNavigateToSegment = { showUserSegment = true },
                     onNavigateToImpact = { showRecipeImpact = true },
+                    onNavigateToConsumption = { showConsumptionAnalytics = true },
+                    onItemClick = { item ->
+                        selectedItem = item
+                        selectedItemTip = ""
+                    },
                     isOnline = isOnline
                 )
                 AppDestinations.DESPENSA -> InventoryScreen(

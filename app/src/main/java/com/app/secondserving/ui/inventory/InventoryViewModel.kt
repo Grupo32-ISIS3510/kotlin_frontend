@@ -3,10 +3,13 @@ package com.app.secondserving.ui.inventory
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.app.secondserving.data.AnalyticsRepository
+import com.app.secondserving.data.ConsumptionCache
 import com.app.secondserving.data.ExpirationNotifier
 import com.app.secondserving.data.InventoryRepository
 import com.app.secondserving.data.Result
 import com.app.secondserving.data.local.FoodItemEntity
+import com.app.secondserving.data.network.ApiException
 import com.app.secondserving.data.network.InventoryItemRequest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -44,7 +47,9 @@ sealed class AddItemUiState {
 
 class InventoryViewModel(
     private val repository: InventoryRepository,
-    private val expirationNotifier: ExpirationNotifier? = null
+    private val expirationNotifier: ExpirationNotifier? = null,
+    private val analyticsRepository: AnalyticsRepository? = null,
+    private val consumptionCache: ConsumptionCache? = null
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<InventoryUiState>(InventoryUiState.Loading)
@@ -64,9 +69,15 @@ class InventoryViewModel(
 
     /**
      * Transforms a raw exception into a user-friendly message.
+     *
+     * ApiException trae un userMessage ya parseado del cuerpo de error del
+     * backend (p.ej. "La fecha de vencimiento debe ser posterior a la fecha
+     * de compra."), así que se muestra tal cual.
      */
     private fun getUserFriendlyMessage(exception: Throwable): String {
+        if (exception is ApiException) return exception.userMessage
         val rootCause = unwrapCause(exception)
+        if (rootCause is ApiException) return rootCause.userMessage
         return when (rootCause) {
             is UnknownHostException -> "No hay conexión a internet. Verifica tu red e intenta de nuevo."
             is java.net.SocketTimeoutException -> "La conexión tardó demasiado. Verifica tu red e intenta de nuevo."
@@ -163,7 +174,8 @@ class InventoryViewModel(
         category: String,
         quantity: Double,
         purchaseDate: String,
-        expiryDate: String
+        expiryDate: String,
+        unitPrice: Double? = null
     ) {
         viewModelScope.launch {
             _addItemState.value = AddItemUiState.Loading
@@ -172,12 +184,18 @@ class InventoryViewModel(
                 category = category,
                 quantity = quantity,
                 purchase_date = purchaseDate,
-                expiry_date = expiryDate
+                expiry_date = expiryDate,
+                unit_price = unitPrice
             )
             when (val result = repository.createInventoryItem(request)) {
                 is Result.Success -> {
                     _addItemState.value = AddItemUiState.Success
                     expirationNotifier?.notifyImmediateExpiration(result.data)
+                    // T4.2: registrar que el usuario agregó un item de esta categoría
+                    analyticsRepository?.logNotificationReceived(
+                        mapOf("event_type" to "item_added", "category" to category)
+                    )
+                    consumptionCache?.incrementAdded(category)
                     loadInventory()
                 }
                 is Result.Error -> {
@@ -237,8 +255,15 @@ class InventoryViewModel(
     fun consumeItem(itemId: String) {
         viewModelScope.launch {
             _actionState.value = ItemActionState.Loading
+            // Capturamos la categoría ANTES de eliminar el item del estado local
+            val category = _allItems.value.find { it.id == itemId }?.category ?: "desconocido"
             when (val result = repository.consumeInventoryItem(itemId)) {
                 is Result.Success -> {
+                    // T4.2: registrar evento de consumo por categoría
+                    analyticsRepository?.logNotificationReceived(
+                        mapOf("event_type" to "item_consumed", "category" to category, "item_id" to itemId)
+                    )
+                    consumptionCache?.incrementConsumed(category)
                     _actionState.value = ItemActionState.Success
                     loadInventory(showLoading = false)
                 }
@@ -252,8 +277,14 @@ class InventoryViewModel(
     fun discardItem(itemId: String, reason: String) {
         viewModelScope.launch {
             _actionState.value = ItemActionState.Loading
+            val category = _allItems.value.find { it.id == itemId }?.category ?: "desconocido"
             when (val result = repository.discardInventoryItem(itemId, reason)) {
                 is Result.Success -> {
+                    // T4.2: el descarte también cuenta como frecuencia de consumo de esa categoría
+                    analyticsRepository?.logNotificationReceived(
+                        mapOf("event_type" to "item_discarded", "category" to category, "item_id" to itemId)
+                    )
+                    consumptionCache?.incrementConsumed(category)
                     _actionState.value = ItemActionState.Success
                     loadInventory(showLoading = false)
                 }
@@ -278,12 +309,14 @@ sealed class ItemActionState {
 
 class InventoryViewModelFactory(
     private val repository: InventoryRepository,
-    private val expirationNotifier: ExpirationNotifier? = null
+    private val expirationNotifier: ExpirationNotifier? = null,
+    private val analyticsRepository: AnalyticsRepository? = null,
+    private val consumptionCache: ConsumptionCache? = null
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(InventoryViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return InventoryViewModel(repository, expirationNotifier) as T
+            return InventoryViewModel(repository, expirationNotifier, analyticsRepository, consumptionCache) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

@@ -96,4 +96,10 @@ class WeatherService(context: Context) {
     private fun isVegetable(name: String) =
         listOf("tomate", "lechuga", "zanahoria", "brocoli", "espinaca",
             "cebolla", "papa", "yuca", "pepino", "apio").any { name.contains(it) }
+
+    /** Borra la caché de clima. Se llama al cerrar sesión para no filtrar
+     *  datos entre usuarios (misma ubicación, pero el nuevo usuario parte limpio). */
+    fun clearCache() {
+        prefs.edit().clear().apply()
+    }
 }

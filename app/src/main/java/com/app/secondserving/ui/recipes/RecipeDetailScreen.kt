@@ -27,7 +27,8 @@ private val BackgroundColor = Color(0xFFF5F5F0)
 fun RecipeDetailScreen(
     recipe: Recipe,
     viewModel: RecipeViewModel,
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    onCookSuccess: () -> Unit = {}
 ) {
     // SSOT: Observamos el estado de la acción de cocinar desde el ViewModel
     val cookState by viewModel.cookState.collectAsStateWithLifecycle(initialValue = CookUiState.Idle)
@@ -61,6 +62,7 @@ fun RecipeDetailScreen(
     LaunchedEffect(cookState) {
         when (cookState) {
             is CookUiState.Success -> {
+                onCookSuccess()
                 dialogMessage = "¡Buen provecho! Ingredientes actualizados."
                 isSuccess = true
                 showDialog = true

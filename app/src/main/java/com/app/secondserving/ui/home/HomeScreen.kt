@@ -89,6 +89,8 @@ fun HomeScreen(
     onNavigateToProfile: () -> Unit = {},
     onNavigateToSegment: () -> Unit = {},
     onNavigateToImpact: () -> Unit = {},
+    onNavigateToConsumption: () -> Unit = {},
+    onItemClick: (InventoryItemUi) -> Unit = {},
     isOnline: Boolean = true
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -121,9 +123,12 @@ fun HomeScreen(
 
         RecipeImpactTeaserCard(onClick = onNavigateToImpact)
 
+        ConsumptionAnalyticsTeaserCard(onClick = onNavigateToConsumption)
+
             ComerPrimeroSection(
                 state = inventoryState,
-                onRetry = { inventoryViewModel.loadInventory() }
+                onRetry = { inventoryViewModel.loadInventory() },
+                onItemClick = onItemClick
             )
 
             PlanDeHoySection()
@@ -169,6 +174,56 @@ private fun RecipeImpactTeaserCard(onClick: () -> Unit) {
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = "Distribución del waste por categoría",
+                    fontSize = 12.sp,
+                    color = TextSecondary
+                )
+            }
+            Text(
+                text = "›",
+                fontSize = 22.sp,
+                color = GreenDark,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+@Composable
+private fun ConsumptionAnalyticsTeaserCard(onClick: () -> Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = CardColor),
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = Color(0xFFE3F2FD),
+                modifier = Modifier.size(48.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(text = "🛒", fontSize = 22.sp)
+                }
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Frecuencia de consumo",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TextPrimary
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "¿Qué categorías consumes más seguido?",
                     fontSize = 12.sp,
                     color = TextSecondary
                 )
@@ -444,7 +499,8 @@ private fun SavingsColumn(
 @Composable
 private fun ComerPrimeroSection(
     state: InventoryUiState,
-    onRetry: () -> Unit
+    onRetry: () -> Unit,
+    onItemClick: (InventoryItemUi) -> Unit = {}
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -498,7 +554,7 @@ private fun ComerPrimeroSection(
                         contentPadding = PaddingValues(end = 4.dp)
                     ) {
                         items(urgentItems) { item ->
-                            ComerPrimeroCard(item = item)
+                            ComerPrimeroCard(item = item, onClick = { onItemClick(item) })
                         }
                     }
                 }
@@ -508,7 +564,7 @@ private fun ComerPrimeroSection(
 }
 
 @Composable
-private fun ComerPrimeroCard(item: InventoryItemUi) {
+private fun ComerPrimeroCard(item: InventoryItemUi, onClick: () -> Unit = {}) {
     val urgencyColor = when (item.urgency) {
         Urgency.RED -> UrgencyRed
         Urgency.YELLOW -> UrgencyYellow
@@ -528,7 +584,8 @@ private fun ComerPrimeroCard(item: InventoryItemUi) {
 
     Card(
         modifier = Modifier
-            .width(150.dp),
+            .width(150.dp)
+            .clickable(onClick = onClick),
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = CardColor),
         elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)

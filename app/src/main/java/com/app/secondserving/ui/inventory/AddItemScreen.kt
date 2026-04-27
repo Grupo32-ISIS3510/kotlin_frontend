@@ -53,12 +53,14 @@ fun AddItemScreen(
     var quantity by rememberSaveable { mutableStateOf("") }
     var purchaseDate by rememberSaveable { mutableStateOf("") }
     var expiryDate by rememberSaveable { mutableStateOf("") }
+    var unitPrice by rememberSaveable { mutableStateOf("") }
     var expanded by rememberSaveable { mutableStateOf(false) }
 
     var nameError by rememberSaveable { mutableStateOf(false) }
     var quantityError by rememberSaveable { mutableStateOf(false) }
     var purchaseDateError by rememberSaveable { mutableStateOf(false) }
     var expiryDateError by rememberSaveable { mutableStateOf(false) }
+    var expiryBeforePurchaseError by rememberSaveable { mutableStateOf(false) }
 
     // Predicción automática de fecha de expiración
     var showPredictionTip by rememberSaveable { mutableStateOf(false) }
@@ -227,6 +229,26 @@ fun AddItemScreen(
                 singleLine = true
             )
 
+            // Precio unitario (COP) — opcional pero necesario para cálculos de ahorro
+            OutlinedTextField(
+                value = unitPrice,
+                onValueChange = { unitPrice = it },
+                label = { Text("Precio unitario (COP)") },
+                placeholder = { Text("ej: 3500", color = GreenDark.copy(alpha = 0.4f)) },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                colors = textFieldColors,
+                singleLine = true,
+                supportingText = {
+                    Text(
+                        "Opcional. Se usa para calcular cuánto ahorraste.",
+                        fontSize = 11.sp,
+                        color = GreenDark.copy(alpha = 0.5f)
+                    )
+                }
+            )
+
             // Fecha de compra con botón de calendario
             OutlinedTextField(
                 value = purchaseDate,
@@ -328,8 +350,13 @@ fun AddItemScreen(
                 label = { Text("Fecha de vencimiento *") },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
-                isError = expiryDateError,
-                supportingText = { if (expiryDateError) Text("La fecha de vencimiento es requerida") },
+                isError = expiryDateError || expiryBeforePurchaseError,
+                supportingText = {
+                    when {
+                        expiryDateError -> Text("La fecha de vencimiento es requerida")
+                        expiryBeforePurchaseError -> Text("Debe ser igual o posterior a la fecha de compra")
+                    }
+                },
                 trailingIcon = {
                     IconButton(onClick = { showExpiryDatePicker = true }) {
                         Icon(
@@ -345,9 +372,19 @@ fun AddItemScreen(
 
             // Dialog selector de fecha de expiración (mismo cambio que el de
             // fecha de compra: pasamos al DatePickerDialog de Material3).
+            // El picker bloquea fechas anteriores a la fecha de compra para
+            // que el usuario no pueda elegir un vencimiento inválido.
             if (showExpiryDatePicker) {
+                val purchaseMillis = if (purchaseDate.isNotBlank()) {
+                    parseDateMillisOrToday(purchaseDate)
+                } else null
                 val state = rememberDatePickerState(
-                    initialSelectedDateMillis = parseDateMillisOrToday(expiryDate)
+                    initialSelectedDateMillis = parseDateMillisOrToday(expiryDate),
+                    selectableDates = object : SelectableDates {
+                        override fun isSelectableDate(utcTimeMillis: Long): Boolean {
+                            return purchaseMillis == null || utcTimeMillis >= purchaseMillis
+                        }
+                    }
                 )
                 DatePickerDialog(
                     onDismissRequest = { showExpiryDatePicker = false },
@@ -392,6 +429,7 @@ fun AddItemScreen(
                     nameError = name.isBlank()
                     quantityError = quantity.toDoubleOrNull() == null
                     purchaseDateError = purchaseDate.isBlank()
+                    expiryBeforePurchaseError = false
 
                     // Usar predicción si no hay fecha de expiración
                     val finalExpiryDate = if (expiryDate.isBlank() && predictedExpiryDate.isNotBlank()) {
@@ -401,13 +439,28 @@ fun AddItemScreen(
                         expiryDate
                     }
 
-                    if (!nameError && !quantityError && !purchaseDateError && !expiryDateError) {
+                    // Validar que vencimiento >= compra (el backend lo rechaza con 422 si no)
+                    if (!purchaseDateError && !expiryDateError && finalExpiryDate.isNotBlank()) {
+                        try {
+                            val purchase = LocalDate.parse(purchaseDate.trim())
+                            val expiry = LocalDate.parse(finalExpiryDate)
+                            if (expiry.isBefore(purchase)) {
+                                expiryBeforePurchaseError = true
+                            }
+                        } catch (_: Exception) {
+                            expiryDateError = true
+                        }
+                    }
+
+                    if (!nameError && !quantityError && !purchaseDateError &&
+                        !expiryDateError && !expiryBeforePurchaseError) {
                         viewModel.createInventoryItem(
                             name = name.trim(),
                             category = category,
                             quantity = quantity.toDouble(),
                             purchaseDate = purchaseDate.trim(),
-                            expiryDate = finalExpiryDate
+                            expiryDate = finalExpiryDate,
+                            unitPrice = unitPrice.toDoubleOrNull()
                         )
                     }
                 },

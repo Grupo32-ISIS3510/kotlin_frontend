@@ -10,6 +10,11 @@ object RetrofitClient {
 
     private const val BASE_URL = "http://3.16.198.192/api/v1/"
 
+    // Callback inyectado por SecondServingApp. Se llama desde el interceptor
+    // de respuesta cuando el backend devuelve 401. No puede llamar a la UI
+    // directamente (hilo de red), por eso usa un flow que la UI colecta.
+    private var onUnauthorized: (() -> Unit)? = null
+
     // EDAMAM_BASE_URL ya no se usa: las recetas vienen del backend del equipo.
     // private const val EDAMAM_BASE_URL = "https://api.edamam.com/"
 
@@ -58,11 +63,22 @@ object RetrofitClient {
     lateinit var authInstance: ApiService
         private set
 
-    fun init(sessionManager: SessionManager) {
+    fun init(sessionManager: SessionManager, onUnauthorized: (() -> Unit)? = null) {
+        RetrofitClient.onUnauthorized = onUnauthorized
         val authInterceptor = AuthInterceptor { sessionManager.getToken() }
 
         val client = OkHttpClient.Builder()
             .addInterceptor(authInterceptor)
+            .addInterceptor { chain ->
+                val response = chain.proceed(chain.request())
+                // 401 = token expirado o inválido. Señalamos a la UI para que
+                // haga logout completo. No lanzamos excepción: devolvemos la
+                // respuesta para que el caller (Repository) la maneje también.
+                if (response.code == 401) {
+                    RetrofitClient.onUnauthorized?.invoke()
+                }
+                response
+            }
             .addInterceptor(logging)
             .build()
 

@@ -7,6 +7,12 @@ import java.io.IOException
 /**
  * Service Adapter / Web Service Broker.
  * Patrón: Encapsula el acceso a servicios remotos (Retrofit).
+ *
+ * Diferenciación de errores:
+ *  - Si el backend respondió con status != 2xx → Result.Error(ApiException(code, userMessage)).
+ *    Estos NO se tratan como offline; la UI muestra el mensaje del servidor.
+ *  - Si hubo fallo real de red (sin respuesta) → Result.Error(IOException(...)).
+ *    Estos sí los puede tomar el repo para encolar pending operations.
  */
 class InventoryServiceAdapter(
     private val apiService: ApiService = RetrofitClient.authInstance
@@ -14,14 +20,12 @@ class InventoryServiceAdapter(
 
     /**
      * Obtiene inventario desde el backend.
-     * @return Result con lista de FoodItemEntity o Error
      */
     suspend fun getInventory(): Result<List<FoodItemEntity>> {
         return try {
             val response = apiService.getInventory()
             when {
                 response.isSuccessful -> {
-                    // El back devuelve {"items":[...],"total":N} — usamos .items
                     val items = response.body()?.items?.map { it.toEntity() } ?: emptyList()
                     Result.Success(items)
                 }
@@ -29,12 +33,12 @@ class InventoryServiceAdapter(
                     // 404 = usuario sin inventario aún (cuenta nueva)
                     Result.Success(emptyList())
                 }
-                else -> Result.Error(
-                    IOException("Error fetching inventory: ${response.code()} ${response.message()}")
-                )
+                else -> Result.Error(response.toApiException("Error al obtener inventario"))
             }
+        } catch (e: IOException) {
+            Result.Error(e)
         } catch (e: Exception) {
-            Result.Error(IOException("Error fetching inventory", e))
+            Result.Error(e)
         }
     }
 
@@ -52,12 +56,12 @@ class InventoryServiceAdapter(
                     Result.Error(IOException("Empty response body from server"))
                 }
             } else {
-                Result.Error(
-                    IOException("Error creating item: ${response.code()} ${response.message()}")
-                )
+                Result.Error(response.toApiException("Error al crear el alimento"))
             }
+        } catch (e: IOException) {
+            Result.Error(e)
         } catch (e: Exception) {
-            Result.Error(IOException("Error creating item", e))
+            Result.Error(e)
         }
     }
 
@@ -70,12 +74,12 @@ class InventoryServiceAdapter(
             if (response.isSuccessful) {
                 Result.Success(Unit)
             } else {
-                Result.Error(
-                    IOException("Error deleting item: ${response.code()} ${response.message()}")
-                )
+                Result.Error(response.toApiException("Error al eliminar el alimento"))
             }
+        } catch (e: IOException) {
+            Result.Error(e)
         } catch (e: Exception) {
-            Result.Error(IOException("Error deleting item", e))
+            Result.Error(e)
         }
     }
 
@@ -86,12 +90,12 @@ class InventoryServiceAdapter(
             if (response.isSuccessful) {
                 Result.Success(Unit)
             } else {
-                Result.Error(
-                    IOException("Error consuming item: ${response.code()} ${response.message()}")
-                )
+                Result.Error(response.toApiException("Error al marcar como consumido"))
             }
+        } catch (e: IOException) {
+            Result.Error(e)
         } catch (e: Exception) {
-            Result.Error(IOException("Error consuming item", e))
+            Result.Error(e)
         }
     }
 
@@ -108,12 +112,12 @@ class InventoryServiceAdapter(
             if (response.isSuccessful) {
                 Result.Success(Unit)
             } else {
-                Result.Error(
-                    IOException("Error discarding item: ${response.code()} ${response.message()}")
-                )
+                Result.Error(response.toApiException("Error al descartar el alimento"))
             }
+        } catch (e: IOException) {
+            Result.Error(e)
         } catch (e: Exception) {
-            Result.Error(IOException("Error discarding item", e))
+            Result.Error(e)
         }
     }
 
@@ -127,7 +131,8 @@ class InventoryServiceAdapter(
                 category = item.category,
                 quantity = item.quantity.toDouble(),
                 purchase_date = item.purchaseDate,
-                expiry_date = item.expiryDate
+                expiry_date = item.expiryDate,
+                unit_price = item.unitPrice
             )
             val response = apiService.updateInventoryItem(item.id, request)
             if (response.isSuccessful) {
@@ -138,12 +143,12 @@ class InventoryServiceAdapter(
                     Result.Error(IOException("Empty response body from server"))
                 }
             } else {
-                Result.Error(
-                    IOException("Error updating item: ${response.code()} ${response.message()}")
-                )
+                Result.Error(response.toApiException("Error al actualizar el alimento"))
             }
+        } catch (e: IOException) {
+            Result.Error(e)
         } catch (e: Exception) {
-            Result.Error(IOException("Error updating item", e))
+            Result.Error(e)
         }
     }
 
@@ -161,12 +166,12 @@ class InventoryServiceAdapter(
                     Result.Error(IOException("Empty response body from server"))
                 }
             } else {
-                Result.Error(
-                    IOException("Error fetching savings analytics: ${response.code()} ${response.message()}")
-                )
+                Result.Error(response.toApiException("Error al obtener métricas de ahorro"))
             }
+        } catch (e: IOException) {
+            Result.Error(e)
         } catch (e: Exception) {
-            Result.Error(IOException("Error fetching savings analytics", e))
+            Result.Error(e)
         }
     }
 }
@@ -180,8 +185,9 @@ private fun InventoryItem.toEntity(): FoodItemEntity {
         name = this.name,
         category = this.category,
         quantity = this.quantity.toInt(),
-        purchaseDate = "", 
+        purchaseDate = "",
         expiryDate = this.expiry_date,
+        unitPrice = this.unit_price?.toDoubleOrNull(),
         originalShelfLifeDays = null,
         createdAt = System.currentTimeMillis(),
         updatedAt = System.currentTimeMillis()

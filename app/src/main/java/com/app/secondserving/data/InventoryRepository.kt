@@ -5,6 +5,7 @@ import com.app.secondserving.data.local.FoodItemDao
 import com.app.secondserving.data.local.FoodItemEntity
 import com.app.secondserving.data.local.PendingOperationDao
 import com.app.secondserving.data.local.PendingOperationEntity
+import com.app.secondserving.data.network.ApiException
 import com.app.secondserving.data.network.DiscardRequest
 import com.app.secondserving.data.network.InventoryItemRequest
 import com.app.secondserving.data.network.InventoryServiceAdapter
@@ -187,6 +188,15 @@ class InventoryRepository(
 
     /**
      * Sincroniza operaciones pendientes con el servidor.
+     *
+     * Política de reintentos:
+     *  - Result.Success → operación completada, se elimina de la cola.
+     *  - Result.Error con ApiException (4xx/5xx) → no es recuperable
+     *    (validación rechazada, item ya inexistente, etc.). Se dropea de la
+     *    cola junto con su entidad temporal local para no reintentar
+     *    infinitamente algo que el backend siempre va a rechazar.
+     *  - Result.Error con IOException u otra → seguimos offline o error
+     *    transitorio; se deja en la cola para el siguiente intento.
      */
     suspend fun syncPendingOperations(): Int {
         val pending = pendingDao.getAllPendingOperations()
@@ -205,14 +215,23 @@ class InventoryRepository(
                 else -> Result.Error(Exception("Unknown type"))
             }
 
-            if (result is Result.Success) {
-                pendingDao.delete(op)
-                // Si fue un CREATE, el ID temporal en Room debe ser reemplazado por el real
-                if (op.type == "CREATE" && result.data is FoodItemEntity) {
-                    dao.deleteItemById(op.itemId)
-                    dao.insertItem(result.data as FoodItemEntity)
+            when (result) {
+                is Result.Success -> {
+                    pendingDao.delete(op)
+                    if (op.type == "CREATE" && result.data is FoodItemEntity) {
+                        dao.deleteItemById(op.itemId)
+                        dao.insertItem(result.data as FoodItemEntity)
+                    }
+                    successCount++
                 }
-                successCount++
+                is Result.Error -> {
+                    if (result.exception is ApiException) {
+                        // Backend rechazó la op de forma definitiva — se descarta.
+                        pendingDao.delete(op)
+                        if (op.type == "CREATE") dao.deleteItemById(op.itemId)
+                    }
+                    // IOException u otros: dejar en cola para el próximo intento.
+                }
             }
         }
         if (successCount > 0) syncInventory()
@@ -221,6 +240,7 @@ class InventoryRepository(
 
     suspend fun clearUserData() {
         dao.deleteAllItems()
+        pendingDao.deleteAll()
         savingsCache?.clear()
     }
 

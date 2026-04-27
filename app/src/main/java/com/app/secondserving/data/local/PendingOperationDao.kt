@@ -18,4 +18,7 @@ interface PendingOperationDao {
 
     @Query("DELETE FROM pending_operations WHERE itemId = :itemId AND type = :type")
     suspend fun deleteByItemIdAndType(itemId: String, type: String)
+
+    @Query("DELETE FROM pending_operations")
+    suspend fun deleteAll()
 }
