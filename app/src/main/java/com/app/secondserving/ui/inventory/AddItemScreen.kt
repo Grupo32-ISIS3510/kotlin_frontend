@@ -325,9 +325,13 @@ fun AddItemScreen(
                     confirmButton = {
                         TextButton(onClick = {
                             state.selectedDateMillis?.let {
-                                purchaseDate = millisToIsoDate(it)
+                                val newPurchase = millisToIsoDate(it)
+                                purchaseDate = newPurchase
                                 purchaseDateError = false
                                 showPredictionTip = false
+                                if (expiryDate.isNotBlank() && isExpiryBeforePurchase(expiryDate, newPurchase)) {
+                                    expiryDate = ""
+                                }
                             }
                             showPurchaseDatePicker = false
                         }) { Text("OK", color = GreenDark) }
@@ -394,9 +398,25 @@ fun AddItemScreen(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 isError = expiryDateError,
-                supportingText = { if (expiryDateError) Text("La fecha de vencimiento es requerida") },
+                supportingText = {
+                    if (expiryDateError) {
+                        Text(
+                            if (purchaseDate.isBlank())
+                                "Selecciona primero la fecha de compra"
+                            else
+                                "La fecha de vencimiento debe ser igual o posterior a la fecha de compra"
+                        )
+                    }
+                },
                 trailingIcon = {
-                    IconButton(onClick = { showExpiryDatePicker = true }) {
+                    IconButton(onClick = {
+                        if (purchaseDate.isBlank()) {
+                            purchaseDateError = true
+                            expiryDateError = true
+                        } else {
+                            showExpiryDatePicker = true
+                        }
+                    }) {
                         Icon(
                             Icons.Default.CalendarToday,
                             contentDescription = "Seleccionar fecha",
@@ -411,8 +431,31 @@ fun AddItemScreen(
             // Dialog selector de fecha de expiración (mismo cambio que el de
             // fecha de compra: pasamos al DatePickerDialog de Material3).
             if (showExpiryDatePicker) {
+                val purchaseMillis = remember(purchaseDate) { parseDateMillisOrNull(purchaseDate) }
+                val initialExpiryMillis = remember(expiryDate, purchaseMillis) {
+                    val current = parseDateMillisOrNull(expiryDate)
+                    when {
+                        current != null && (purchaseMillis == null || current >= purchaseMillis) -> current
+                        purchaseMillis != null -> purchaseMillis
+                        else -> LocalDate.now().atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+                    }
+                }
+                val selectableDates = remember(purchaseMillis) {
+                    object : SelectableDates {
+                        override fun isSelectableDate(utcTimeMillis: Long): Boolean =
+                            purchaseMillis == null || utcTimeMillis >= purchaseMillis
+
+                        override fun isSelectableYear(year: Int): Boolean {
+                            if (purchaseMillis == null) return true
+                            val purchaseYear = Instant.ofEpochMilli(purchaseMillis)
+                                .atZone(ZoneOffset.UTC).toLocalDate().year
+                            return year >= purchaseYear
+                        }
+                    }
+                }
                 val state = rememberDatePickerState(
-                    initialSelectedDateMillis = parseDateMillisOrToday(expiryDate)
+                    initialSelectedDateMillis = initialExpiryMillis,
+                    selectableDates = selectableDates
                 )
                 DatePickerDialog(
                     onDismissRequest = { showExpiryDatePicker = false },
@@ -474,6 +517,11 @@ fun AddItemScreen(
                         expiryDate
                     }
 
+                    if (!purchaseDateError && finalExpiryDate.isNotBlank() &&
+                        isExpiryBeforePurchase(finalExpiryDate, purchaseDate)) {
+                        expiryDateError = true
+                    }
+
                     if (!nameError && !quantityError && !priceError && !purchaseDateError && !expiryDateError) {
                         viewModel.createInventoryItem(
                             name = name.trim(),
@@ -529,4 +577,19 @@ private fun parseDateMillisOrToday(dateStr: String): Long {
 
 private fun millisToIsoDate(millis: Long): String {
     return Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate().format(DATE_FORMAT)
+}
+
+private fun parseDateMillisOrNull(dateStr: String): Long? {
+    return try {
+        if (dateStr.isBlank()) null
+        else LocalDate.parse(dateStr).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+    } catch (e: Exception) {
+        null
+    }
+}
+
+private fun isExpiryBeforePurchase(expiry: String, purchase: String): Boolean {
+    val e = parseDateMillisOrNull(expiry) ?: return false
+    val p = parseDateMillisOrNull(purchase) ?: return false
+    return e < p
 }
