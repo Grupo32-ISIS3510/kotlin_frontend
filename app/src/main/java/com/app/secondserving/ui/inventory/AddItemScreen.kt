@@ -51,12 +51,14 @@ fun AddItemScreen(
     var name by rememberSaveable { mutableStateOf("") }
     var category by rememberSaveable { mutableStateOf("Frutas") }
     var quantity by rememberSaveable { mutableStateOf("") }
+    var price by rememberSaveable { mutableStateOf("") }
     var purchaseDate by rememberSaveable { mutableStateOf("") }
     var expiryDate by rememberSaveable { mutableStateOf("") }
     var expanded by rememberSaveable { mutableStateOf(false) }
 
     var nameError by rememberSaveable { mutableStateOf(false) }
     var quantityError by rememberSaveable { mutableStateOf(false) }
+    var priceError by rememberSaveable { mutableStateOf(false) }
     var purchaseDateError by rememberSaveable { mutableStateOf(false) }
     var expiryDateError by rememberSaveable { mutableStateOf(false) }
 
@@ -100,6 +102,25 @@ fun AddItemScreen(
         unfocusedTextColor = GreenDark,
         focusedTrailingIconColor = GreenDark,
         unfocusedTrailingIconColor = GreenDark
+    )
+
+    val datePickerColors = DatePickerDefaults.colors(
+        containerColor = Color.White,
+        titleContentColor = GreenDark,
+        headlineContentColor = GreenDark,
+        weekdayContentColor = GreenDark,
+        subheadContentColor = GreenDark,
+        yearContentColor = GreenDark,
+        currentYearContentColor = GreenDark,
+        selectedYearContentColor = Color.White,
+        selectedYearContainerColor = GreenDark,
+        dayContentColor = GreenDark,
+        selectedDayContentColor = Color.White,
+        selectedDayContainerColor = GreenDark,
+        todayContentColor = GreenDark,
+        todayDateBorderColor = GreenDark,
+        navigationContentColor = GreenDark,
+        dividerColor = GreenDark.copy(alpha = 0.3f)
     )
 
     Scaffold(
@@ -173,12 +194,17 @@ fun AddItemScreen(
 
             OutlinedTextField(
                 value = name,
-                onValueChange = { name = it; nameError = false },
+                onValueChange = { if (it.length <= 20) { name = it; nameError = false } },
                 label = { Text("Nombre *") },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 isError = nameError,
-                supportingText = { if (nameError) Text("El nombre es requerido") },
+                supportingText = {
+                    when {
+                        nameError -> Text("El nombre es requerido")
+                        else -> Text("${name.length}/20")
+                    }
+                },
                 colors = textFieldColors,
                 singleLine = true
             )
@@ -202,12 +228,14 @@ fun AddItemScreen(
                 )
                 ExposedDropdownMenu(
                     expanded = expanded,
-                    onDismissRequest = { expanded = false }
+                    onDismissRequest = { expanded = false },
+                    modifier = Modifier.background(Color.White)
                 ) {
                     CATEGORIES.forEach { option ->
                         DropdownMenuItem(
                             text = { Text(option, color = GreenDark) },
-                            onClick = { category = option; expanded = false }
+                            onClick = { category = option; expanded = false },
+                            colors = MenuDefaults.itemColors(textColor = GreenDark)
                         )
                     }
                 }
@@ -216,12 +244,44 @@ fun AddItemScreen(
             // Cantidad
             OutlinedTextField(
                 value = quantity,
-                onValueChange = { quantity = it; quantityError = false },
+                onValueChange = {
+                    val parsed = it.toDoubleOrNull()
+                    if (it.isEmpty() || parsed == null || parsed <= 1000.0) {
+                        quantity = it
+                        quantityError = false
+                    }
+                },
                 label = { Text("Cantidad *") },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 isError = quantityError,
-                supportingText = { if (quantityError) Text("La cantidad debe ser un número válido (ej: 2, 1.5)") },
+                supportingText = {
+                    if (quantityError) Text("Ingresa un número válido entre 0 y 1000 (ej: 2, 1.5)")
+                    else Text("Máx. 1000")
+                },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                colors = textFieldColors,
+                singleLine = true
+            )
+
+            // Costo del alimento (requerido, en COP)
+            OutlinedTextField(
+                value = price,
+                onValueChange = {
+                    val parsed = it.toDoubleOrNull()
+                    if (it.isEmpty() || (parsed != null && parsed >= 0.0 && parsed <= 1_000_000.0)) {
+                        price = it
+                        priceError = false
+                    }
+                },
+                label = { Text("Costo (COP) *") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                isError = priceError,
+                supportingText = {
+                    if (priceError) Text("Ingresa un valor entre 0 y 1.000.000")
+                    else Text("Máx. 1.000.000")
+                },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 colors = textFieldColors,
                 singleLine = true
@@ -276,9 +336,14 @@ fun AddItemScreen(
                         TextButton(onClick = { showPurchaseDatePicker = false }) {
                             Text("Cancelar", color = GreenDark)
                         }
-                    }
+                    },
+                    colors = datePickerColors
                 ) {
-                    DatePicker(state = state, title = { Text("Fecha de compra", modifier = Modifier.padding(16.dp), color = GreenDark) })
+                    DatePicker(
+                        state = state,
+                        title = { Text("Fecha de compra", modifier = Modifier.padding(16.dp), color = GreenDark) },
+                        colors = datePickerColors
+                    )
                 }
             }
 
@@ -365,9 +430,14 @@ fun AddItemScreen(
                         TextButton(onClick = { showExpiryDatePicker = false }) {
                             Text("Cancelar", color = GreenDark)
                         }
-                    }
+                    },
+                    colors = datePickerColors
                 ) {
-                    DatePicker(state = state, title = { Text("Fecha de vencimiento", modifier = Modifier.padding(16.dp), color = GreenDark) })
+                    DatePicker(
+                        state = state,
+                        title = { Text("Fecha de vencimiento", modifier = Modifier.padding(16.dp), color = GreenDark) },
+                        colors = datePickerColors
+                    )
                 }
             }
 
@@ -390,7 +460,10 @@ fun AddItemScreen(
             Button(
                 onClick = {
                     nameError = name.isBlank()
-                    quantityError = quantity.toDoubleOrNull() == null
+                    val parsedQuantity = quantity.toDoubleOrNull()
+                    quantityError = parsedQuantity == null || parsedQuantity <= 0.0 || parsedQuantity > 1000.0
+                    val parsedPrice = price.trim().toDoubleOrNull()
+                    priceError = parsedPrice == null || parsedPrice < 0.0 || parsedPrice > 1_000_000.0
                     purchaseDateError = purchaseDate.isBlank()
 
                     // Usar predicción si no hay fecha de expiración
@@ -401,13 +474,14 @@ fun AddItemScreen(
                         expiryDate
                     }
 
-                    if (!nameError && !quantityError && !purchaseDateError && !expiryDateError) {
+                    if (!nameError && !quantityError && !priceError && !purchaseDateError && !expiryDateError) {
                         viewModel.createInventoryItem(
                             name = name.trim(),
                             category = category,
                             quantity = quantity.toDouble(),
                             purchaseDate = purchaseDate.trim(),
-                            expiryDate = finalExpiryDate
+                            expiryDate = finalExpiryDate,
+                            price = parsedPrice
                         )
                     }
                 },

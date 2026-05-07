@@ -79,10 +79,10 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun getStorageTip(itemName: String): String {
+    fun getStorageTip(itemName: String, category: String): String {
         val state = _weatherState.value
         return if (state is WeatherUiState.Success) {
-            weatherService.getStorageTip(itemName, state.weather)
+            weatherService.getStorageTip(itemName, category, state.weather)
         } else {
             " Cargando recomendación..."
         }

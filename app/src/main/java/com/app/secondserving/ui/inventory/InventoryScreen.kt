@@ -295,7 +295,7 @@ fun InventoryScreen(
                             contentPadding = PaddingValues(bottom = 16.dp)
                         ) {
                             items(state.items) { item ->
-                                val tip = weatherViewModel.getStorageTip(item.name)
+                                val tip = weatherViewModel.getStorageTip(item.name, item.category)
                                 InventoryCard(
                                     item = item,
                                     storageTip = tip,

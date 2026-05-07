@@ -262,7 +262,10 @@ private fun ActionsCard(
                     onClick = onConsume,
                     modifier = Modifier.weight(1f),
                     enabled = !isLoading,
-                    colors = ButtonDefaults.buttonColors(containerColor = GreenDark)
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = GreenDark,
+                        contentColor = Color.White
+                    )
                 ) {
                     if (isLoading) {
                         CircularProgressIndicator(

@@ -394,6 +394,7 @@ fun MyApplicationApp() {
                 AppDestinations.RECETAS -> {
                     RecipeScreen(
                         viewModel = recipeViewModel,
+                        inventoryViewModel = inventoryViewModel,
                         onRecipeClick = { recipe -> selectedRecipe = recipe }
                     )
                 }

@@ -378,18 +378,6 @@ private fun SavingsCard(state: HomeUiState, onRetry: () -> Unit) {
                         modifier = Modifier.weight(1f),
                         onInfoClick = { showInfoDialog = true }
                     )
-                    Box(
-                        modifier = Modifier
-                            .width(1.dp)
-                            .height(56.dp)
-                            .background(Color(0xFFE5E7EB))
-                    )
-                    SavingsColumn(
-                        label = "CO\u2082 EVITADO",
-                        value = "Próximamente",
-                        valueFontSize = 15.sp,
-                        modifier = Modifier.weight(1f)
-                    )
                 }
             }
         }

@@ -4,5 +4,6 @@ data class InventoryItemRequest(
     val category: String,
     val quantity: Double,
     val purchase_date: String,
-    val expiry_date: String
+    val expiry_date: String,
+    val price: Double? = null
 )

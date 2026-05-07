@@ -17,6 +17,7 @@ import kotlinx.coroutines.launch
 data class RecipesUiState(
     val recipes: List<Recipe> = emptyList(),
     val isLoading: Boolean = false,
+    val isRefreshing: Boolean = false,
     val isCooking: Boolean = false,
     val error: String? = null,
     val isEmpty: Boolean = false
@@ -50,32 +51,49 @@ class RecipeViewModel(private val repository: RecipeRepository) : ViewModel() {
         fetchRecipes()
     }
 
-    fun fetchRecipes() {
+    fun fetchRecipes(isPullRefresh: Boolean = false) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null, isEmpty = false) }
+            _uiState.update {
+                if (isPullRefresh) it.copy(isRefreshing = true, error = null)
+                else it.copy(isLoading = true, error = null, isEmpty = false)
+            }
 
             when (val result = repository.getRecommendedRecipes()) {
                 is Result.Success -> {
-                    // Filtramos recetas sin título o sin id porque el backend a veces
-                    // devuelve recetas con metadata incompleta y mostrar tarjetas
-                    // genéricas "Sin título" no aporta nada al usuario.
-                    val validRecipes = result.data.filter {
-                        !it.title.isNullOrBlank() && !it.id.isNullOrBlank()
+                    // Filtramos por dos cosas:
+                    //  1) Metadata mínima (id + título) — el backend a veces devuelve
+                    //     recetas incompletas.
+                    //  2) inventory_matches > 0 — el endpoint /suggestions del backend
+                    //     ordena por matches pero NO filtra los ceros, así que cuando
+                    //     ninguna receta usa los items del usuario igual te llegan las
+                    //     top N con score 0. Aquí dropeamos esas para que la pantalla
+                    //     de "Recomendaciones Inteligentes" sea pertinente al inventario.
+                    //     Ver app/recipes/service.py::get_suggestions en el backend.
+                    val validRecipes = result.data.filter { recipe ->
+                        val hasIdAndTitle = !recipe.title.isNullOrBlank() && !recipe.id.isNullOrBlank()
+                        val hasInventoryMatch = (recipe.inventory_matches ?: 0) > 0
+                        hasIdAndTitle && hasInventoryMatch
                     }
                     if (validRecipes.isEmpty()) {
-                        _uiState.update { it.copy(isLoading = false, isEmpty = true, recipes = emptyList()) }
+                        _uiState.update {
+                            it.copy(isLoading = false, isRefreshing = false, isEmpty = true, recipes = emptyList())
+                        }
                     } else {
-                        // T2.3: Ranked list - Sort by score (descending) and then by expiry days (ascending)
-                        val rankedRecipes = validRecipes.sortedWith(
-                            compareByDescending<Recipe> { it.score ?: 0.0 }
-                                .thenBy { it.soonest_expiry_days ?: Int.MAX_VALUE }
-                        )
-                        _uiState.update { it.copy(isLoading = false, recipes = rankedRecipes) }
+                        // Orden descendente por inventory_matches (la única señal de
+                        // ranking que el backend incluye en RecipeSummaryResponse).
+                        val rankedRecipes = validRecipes.sortedByDescending { it.inventory_matches ?: 0 }
+                        _uiState.update {
+                            it.copy(isLoading = false, isRefreshing = false, isEmpty = false, recipes = rankedRecipes)
+                        }
                     }
                 }
                 is Result.Error -> {
                     _uiState.update {
-                        it.copy(isLoading = false, error = result.exception.message ?: "Error desconocido")
+                        it.copy(
+                            isLoading = false,
+                            isRefreshing = false,
+                            error = result.exception.message ?: "Error desconocido"
+                        )
                     }
                 }
             }

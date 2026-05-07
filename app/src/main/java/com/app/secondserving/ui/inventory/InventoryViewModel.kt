@@ -57,6 +57,7 @@ class InventoryViewModel(
     val selectedCategory: StateFlow<String> = _selectedCategory.asStateFlow()
 
     private val _allItems = MutableStateFlow<List<InventoryItemUi>>(emptyList())
+    val allItems: StateFlow<List<InventoryItemUi>> = _allItems.asStateFlow()
     private val _expiredItems = MutableStateFlow<List<InventoryItemUi>>(emptyList())
     val expiredItems: StateFlow<List<InventoryItemUi>> = _expiredItems.asStateFlow()
     private val _addItemState = MutableStateFlow<AddItemUiState>(AddItemUiState.Idle)
@@ -163,7 +164,8 @@ class InventoryViewModel(
         category: String,
         quantity: Double,
         purchaseDate: String,
-        expiryDate: String
+        expiryDate: String,
+        price: Double? = null
     ) {
         viewModelScope.launch {
             _addItemState.value = AddItemUiState.Loading
@@ -172,7 +174,8 @@ class InventoryViewModel(
                 category = category,
                 quantity = quantity,
                 purchase_date = purchaseDate,
-                expiry_date = expiryDate
+                expiry_date = expiryDate,
+                price = price
             )
             when (val result = repository.createInventoryItem(request)) {
                 is Result.Success -> {

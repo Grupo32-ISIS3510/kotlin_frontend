@@ -6,10 +6,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.RestaurantMenu
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -21,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.app.secondserving.data.network.Recipe
+import com.app.secondserving.ui.inventory.InventoryViewModel
 
 private val GreenDark = Color(0xFF386641)
 private val BackgroundColor = Color(0xFFF5F5F0)
@@ -31,9 +34,12 @@ private val StarColor = Color(0xFFFFB703)
 @Composable
 fun RecipeScreen(
     viewModel: RecipeViewModel,
+    inventoryViewModel: InventoryViewModel,
     onRecipeClick: (Recipe) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val inventoryItems by inventoryViewModel.allItems.collectAsStateWithLifecycle()
+    val isInventoryEmpty = inventoryItems.isEmpty()
 
     Scaffold(
         topBar = {
@@ -56,12 +62,31 @@ fun RecipeScreen(
                     modifier = Modifier.align(Alignment.Center),
                     color = GreenDark
                 )
-            } else if (uiState.error != null) {
-                ErrorState(message = uiState.error!!, onRetry = { viewModel.fetchRecipes() })
-            } else if (uiState.isEmpty) {
-                EmptyRecipesState()
             } else {
-                RecipeList(recipes = uiState.recipes, onRecipeClick = onRecipeClick)
+                PullToRefreshBox(
+                    isRefreshing = uiState.isRefreshing,
+                    onRefresh = {
+                        // Recargamos despensa Y recetas: el usuario suele tirar
+                        // refresh justo cuando cambió items en la alacena en otra
+                        // pestaña, así reflejamos ambos cambios sin friccción.
+                        inventoryViewModel.loadInventory(showLoading = false)
+                        viewModel.fetchRecipes(isPullRefresh = true)
+                    },
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    when {
+                        isInventoryEmpty -> EmptyPantryState()
+                        uiState.error != null -> ErrorState(
+                            message = uiState.error!!,
+                            onRetry = { viewModel.fetchRecipes() }
+                        )
+                        uiState.isEmpty -> EmptyRecipesState()
+                        else -> RecipeList(
+                            recipes = uiState.recipes,
+                            onRecipeClick = onRecipeClick
+                        )
+                    }
+                }
             }
             
             // Overlay de carga cuando se está "cocinando"
@@ -195,6 +220,35 @@ fun RecipeCard(recipe: Recipe, onClick: () -> Unit) {
                 }
             }
         }
+    }
+}
+
+@Composable
+fun EmptyPantryState() {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            Icons.Default.Inventory2,
+            contentDescription = null,
+            modifier = Modifier.size(64.dp),
+            tint = Color.LightGray
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            "No hay recetas disponibles",
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.Gray
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            "No tienes comida registrada en tu despensa. Agrega alimentos para ver recetas que puedas preparar.",
+            textAlign = TextAlign.Center,
+            color = Color.Gray
+        )
     }
 }
 

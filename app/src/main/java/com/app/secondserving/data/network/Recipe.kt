@@ -1,5 +1,7 @@
 package com.app.secondserving.data.network
 
+import com.google.gson.annotations.SerializedName
+
 // Modelo alineado con el JSON real que devuelve GET /recipes/suggestions:
 // {id, name, description, category, prep_time_minutes, servings,
 //  image_url, inventory_matches}.
@@ -31,7 +33,13 @@ data class Recipe(
     val title: String? get() = name
 }
 
+// El backend serializa el nombre como `ingredient_name`
+// (ver app/recipes/schemas.py::RecipeIngredientResponse en el repo backend_app).
+// Mantenemos `name` como nombre de propiedad en Kotlin para no tener que
+// renombrar todas las referencias en la UI; @SerializedName lo mapea desde
+// la clave correcta del JSON.
 data class RecipeIngredient(
+    @SerializedName("ingredient_name")
     val name: String? = null,
     val quantity: String? = null,
     val unit: String? = null
