@@ -80,7 +80,7 @@ class SecondServingApp : Application() {
         }
     }
 
-    private fun registerFcmTokenIfLoggedIn() {
+    fun registerFcmTokenIfLoggedIn() {
         if (sessionManager.getToken() == null) return
         FirebaseMessaging.getInstance().token.addOnSuccessListener { token ->
             registerFcmToken(token)

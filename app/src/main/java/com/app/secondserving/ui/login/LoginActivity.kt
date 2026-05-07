@@ -19,6 +19,7 @@ import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
 import com.app.secondserving.MainActivity
 import com.app.secondserving.R
+import com.app.secondserving.SecondServingApp
 import com.app.secondserving.data.SessionManager
 import com.app.secondserving.databinding.ActivityLoginBinding
 
@@ -178,6 +179,8 @@ class LoginActivity : AppCompatActivity() {
                     userId = result.success.userId
                 )
                 clearAuthError()
+
+                (application as SecondServingApp).registerFcmTokenIfLoggedIn()
 
                 startActivity(Intent(this, MainActivity::class.java))
                 finish()
